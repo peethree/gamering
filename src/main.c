@@ -24,38 +24,76 @@ int main ()
 	SearchAndSetResourceDir("resources");
 
 	// Load a texture from the resources directory
-	Texture frog = LoadTexture("frog.png");
+	Texture2D frog = LoadTexture("frog.png");
 
 	Vector2 frogPosition = { (float)GetScreenWidth()/2, (float)GetScreenHeight()/2 };
 
 	// frame width of individual textures in the frog sprite sheet
-	float frameWidth = (float)(frog.width / 8)
+	float frameWidth = (float)(frog.width / 8);
+
+	int maxFrames = (int)frog.width / (int)frameWidth;
+	float timer = 0.0f;
+	int frame = 0;
+
+	// jump animation variables
+	bool isJumping = false;
+	float jumpTimer = 0.0f;
+	float jumpDuration = 2.0f; 
+
+	// sprite direction variables
+	bool isFacingRight = false;
 
 	// game loop
-	while (!WindowShouldClose())		// run the loop untill the user presses ESCAPE or presses the Close button on the window
+	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
 		// drawing
 		BeginDrawing();
 
-		if (IsKeyDown(KEY_RIGHT)) frogPosition.x += 2.0f;
-        if (IsKeyDown(KEY_LEFT)) frogPosition.x -= 2.0f;
-        if (IsKeyDown(KEY_UP)) frogPosition.y -= 2.0f;
-        if (IsKeyDown(KEY_DOWN)) frogPosition.y += 2.0f;
+		if (IsKeyDown(KEY_RIGHT)) {
+			frogPosition.x += 2.0f;
+			isFacingRight = true;
+		}
+        if (IsKeyDown(KEY_LEFT)) {
+			frogPosition.x -= 2.0f;
+			isFacingRight = false;
+		}
+        // if (IsKeyDown(KEY_UP)) frogPosition.y -= 2.0f;
+        // if (IsKeyDown(KEY_DOWN)) frogPosition.y += 2.0f;
+
+		if (IsKeyPressed(KEY_SPACE)) {
+			isJumping = true;
+			jumpTimer = jumpDuration;
+		}
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
 		ClearBackground(BLACK);
 
-		// draw some text using the default font
-		DrawText("Hello Baby!!!!", 200,200,20,WHITE);
+		// sprite animation timer
+		timer += GetFrameTime();
 
-		// draw our texture to the screen
+		if (timer > 0.2f) {
+			timer = 0.0;
+			if (isJumping) {
+				frame++;
+				frame = frame % maxFrames;
+			}
+		}
+		
+		if (isJumping) {
+			jumpTimer -= GetFrameTime();
+			if (jumpTimer < 0.0f) {
+				isJumping = false;
+				frame = 0;
+			}
+		}
+		
+
 		DrawTextureRec(
 			frog, 
-			Rectangle{frogPosition.x, frogPosition.y, frameWidth, (float)frog.height},
-			frogPosition,				
-			RAYWHITE
-		);      
-		
+			(Rectangle){frameWidth * frame, 0, frameWidth, (float)frog.height}, 
+			frogPosition, 
+			RAYWHITE);  
+
 		// end the frame and get ready for the next one  (display frame, poll input, etc...)
 		EndDrawing();
 	}
