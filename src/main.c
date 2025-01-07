@@ -38,7 +38,7 @@ int main ()
 	// jump animation variables
 	bool isJumping = false;
 	float jumpTimer = 0.0f;
-	float jumpDuration = 2.0f; 
+	float jumpDuration = 1.9f; 
 
 	// sprite direction variables
 	bool isFacingRight = false;
@@ -61,6 +61,13 @@ int main ()
         // if (IsKeyDown(KEY_DOWN)) frogPosition.y += 2.0f;
 
 		if (IsKeyPressed(KEY_SPACE)) {
+			if (isFacingRight) {
+				// TODO: increase these values
+				frogPosition.x += 10.0f;
+				frogPosition.y += 10.0f;
+			}
+			frogPosition.x -= 10.0f;
+			frogPosition.y -= 10.0f;
 			isJumping = true;
 			jumpTimer = jumpDuration;
 		}
@@ -90,7 +97,11 @@ int main ()
 
 		DrawTextureRec(
 			frog, 
-			(Rectangle){frameWidth * frame, 0, frameWidth, (float)frog.height}, 
+			(Rectangle){
+				frameWidth * frame, 
+				0, 
+				isFacingRight ? -frameWidth : frameWidth, 
+				(float)frog.height}, 
 			frogPosition, 
 			RAYWHITE);  
 
