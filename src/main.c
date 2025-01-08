@@ -66,7 +66,7 @@ int main ()
 	
 		// jump
 		if (IsKeyPressed(KEY_SPACE)) {
-			player->vel.y = -360.0;
+			player->velocity.y = -360.0;
 		}
 	}
 
