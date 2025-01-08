@@ -1,6 +1,6 @@
 #include "raylib.h"
 
-#include "resource_dir.h"	// utility header for SearchAndSetResourceDir
+#include "resource_dir.h"	
 
 int main ()
 {
@@ -17,7 +17,11 @@ int main ()
 	// Load a texture from the resources directory
 	Texture2D frog = LoadTexture("frog.png");
 
+	// positions
 	Vector2 frogPosition = { (float)GetScreenWidth()/2, (float)GetScreenHeight()/2 };
+	Vector2 currentPosition;
+	Vector2 destinationPosition;
+
 
 	// frame width of individual textures in the frog sprite sheet
 	float frameWidth = (float)(frog.width / 8);
@@ -34,32 +38,38 @@ int main ()
 	// sprite direction variables
 	bool isFacingRight = false;
 
+	// add gravity and velocity
+	// make a struct for the frog that stores texture, position, velocity etc
+
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
 		// drawing
 		BeginDrawing();
-
+		
+		// side movement
 		if (IsKeyDown(KEY_RIGHT)) {
 			frogPosition.x += 2.0f;
 			isFacingRight = true;
 		}
-        if (IsKeyDown(KEY_LEFT)) {
+	        if (IsKeyDown(KEY_LEFT)) {
 			frogPosition.x -= 2.0f;
 			isFacingRight = false;
 		}
-        // if (IsKeyDown(KEY_UP)) frogPosition.y -= 2.0f;
-        // if (IsKeyDown(KEY_DOWN)) frogPosition.y += 2.0f;
 
+		// jump
 		if (IsKeyPressed(KEY_SPACE)) {
-			if (isFacingRight) {
-				// TODO: increase these values
-				frogPosition.x += 10.0f;
-				frogPosition.y += 10.0f;
-			}
-			frogPosition.x -= 10.0f;
-			frogPosition.y -= 10.0f;
 			isJumping = true;
+
+			if (isFacingRight) {
+				// TODO: gradually update these values
+				frogPosition.x -= 100.0f;
+				frogPosition.y -= 100.0f;
+			}
+			
+			frogPosition.x += 100.0f;
+			frogPosition.y -= 100.0f;
+
 			jumpTimer = jumpDuration;
 		}
 
@@ -69,6 +79,7 @@ int main ()
 		// sprite animation timer
 		timer += GetFrameTime();
 
+		// jump animation frame variable for sprite selection
 		if (timer > 0.2f) {
 			timer = 0.0;
 			if (isJumping) {
@@ -76,7 +87,8 @@ int main ()
 				frame = frame % maxFrames;
 			}
 		}
-		
+
+		// jump duration
 		if (isJumping) {
 			jumpTimer -= GetFrameTime();
 			if (jumpTimer < 0.0f) {
@@ -85,7 +97,7 @@ int main ()
 			}
 		}
 		
-
+		// draw frog
 		DrawTextureRec(
 			frog, 
 			(Rectangle){
