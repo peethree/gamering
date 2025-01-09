@@ -38,8 +38,8 @@ int main ()
 	// gravity
 	void apply_gravity(Frog *frog) {
 		frog->velocity.y += 25.0;
-		if (sprite->vel.y > 450.0) {
-			sprite->vel.y = 450.0;
+		if (sprite->velocity.y > 450.0) {
+			sprite->velocity.y = 450.0;
 		}
 	}
 
@@ -71,13 +71,11 @@ int main ()
 	}
 
 
-	void apply_velocity_x(Frog *frog) {
+	void apply_velocity(Frog *frog) {
 		frog->destinationPosition.x += frog->velocity.x * GetFrameTime();
-	}
-
-	void apply_velocity_y(Frog *frog) {
 		frog->destinationPosition.y += frog->velocity.y * GetFrameTime();
 	}
+
 
 	// TODO: update 
 	// Vector2 frogPosition = { (float)GetScreenWidth()/2, (float)GetScreenHeight()/2 };
@@ -108,10 +106,8 @@ int main ()
 
 		// update 
 		apply_gravity(&player)
-		move_frog(&player)
-
-		apply_velocity_x(&player)
-		apply_velocity_y(&player)
+		move_frog(&player)		
+		apply_velocity(&player)
 
 		  // if below ground, put back on ground
     	if (player.destinationPosition.y > GetScreenHeight() - player.destinationPosition.height) {
