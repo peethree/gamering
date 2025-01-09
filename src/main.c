@@ -2,8 +2,92 @@
 
 #include "resource_dir.h"	
 
+	// keep track of direction
+	typedef enum Direction {
+		LEFT = -1,
+		RIGHT = 1,
+	} Direction;
+
+	// struct for frog sprite
+	typedef struct Frog{
+		Texture2D texture;		
+		Rectangle destinationPosition;
+		Vector2 velocity;
+		Direction direction;
+		//jump related
+		bool isJumping; 		
+		int frame;
+		float jumpTimer; 
+    	float frameTimer; 		
+	} Frog;
+
+	// gravity
+	void apply_gravity(Frog *froggy) {
+		froggy->velocity.y += 25.0;
+
+		if (froggy->velocity.y > 450.0) {
+			froggy->velocity.y = 450.0;
+		}
+	}
+
+	// movement	
+	void move_frog(Frog *froggy, int maxFrames) {
+    
+		const float frameDuration = 0.2f;  // Time per frame during jump
+		const float jumpDuration = 1.2f;   // Total jump duration
+
+		froggy->velocity.x = 0.0;
+
+		// side movement
+		if (IsKeyDown(KEY_D)) {
+			froggy->velocity.x = 120.0;
+			froggy->direction = RIGHT;
+		}
+
+		if (IsKeyDown(KEY_A)) {
+			froggy->velocity.x = -120.0;
+			froggy->direction = LEFT;
+		}
+
+		// jump (prevent double jumps)
+		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
+			froggy->velocity.y = -660.0;
+			froggy->isJumping = true;
+			froggy->jumpTimer = jumpDuration;
+
+			// start at third frame for more believable animation
+			froggy->frame = 3;          
+			froggy->frameTimer = 0.0f;  
+		}
+		
+		if (froggy->isJumping) {			
+			froggy->frameTimer += GetFrameTime();
+			
+			if (froggy->frameTimer >= frameDuration) {
+				froggy->frameTimer = 0.0f;
+				froggy->frame = (froggy->frame + 1) % maxFrames; // Cycle through frames
+			}
+			
+			// countdown jumptimer to 0
+			froggy->jumpTimer -= GetFrameTime();
+			if (froggy->jumpTimer <= 0.0f) {
+				froggy->jumpTimer = 0.0f; 
+				// reset jump status
+				froggy->isJumping = false;
+				// resting frog texture
+				froggy->frame = 0;       
+			}
+		}
+	}	
+
+	void apply_velocity(Frog *froggy) {
+		froggy->destinationPosition.x += froggy->velocity.x * GetFrameTime();
+		froggy->destinationPosition.y += froggy->velocity.y * GetFrameTime();
+	}
+	
+
 int main ()
-{
+{	
 	// Tell the window to use vsync and work on high DPI displays
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
 	SetTargetFPS(60);
@@ -14,172 +98,68 @@ int main ()
 	// Utility function from resource_dir.h to find the resources folder and set it as the current working directory so we can load from it
 	SearchAndSetResourceDir("resources");
 
-	// Load a texture from the resources directory
-	// TODO: move into struct
-	// Texture2D frog = LoadTexture("frog.png");
+	Texture2D frog_texture = LoadTexture("frog.png");	
 
-	// keep track of direction
-	typedef enum Direction {
-		LEFT = -1,
-		RIGHT = 1,
-	};
-
-
-	// struct for frog sprite
-	typedef struct Frog{
-		Texture2D texture;
-		// Rectangle currentPosition;
-		Rectangle destinationPostion;
-		Vector2 velocity;
-		Direction direction;
-	} Frog;
+	Frog froggy = (Frog){.texture = frog_texture,
+						.destinationPosition =
+							(Rectangle){
+								.x = 100.0,
+								.y = 0.0,
+								.width = 0.0,
+								.height = 36.0,
+							},						
+						.direction = RIGHT,
+						.isJumping = false,
+						.frame = 0,
+						.jumpTimer = 0.0f,   
+    					.frameTimer = 0.0f};
 
 
-	// gravity
-	void apply_gravity(Frog *frog) {
-		frog->velocity.y += 25.0;
-		if (sprite->velocity.y > 450.0) {
-			sprite->velocity.y = 450.0;
-		}
-	}
+ 
+	SetTraceLogLevel(LOG_INFO);  // Enable debug logging
 
-	// movement
-	void move_player(Frog *player) {
-	// gradual -> multiply velocity with
-	// float under 1.0f -> += -=
+	// 8 pictures on the sprite sheet -> 
+	float frameWidth = (float)(frog_texture.width / 8);
+	int maxFrames = (int)frog_texture.width / (int)frameWidth;
 	
-
-		// default: no .x movement
-		player->velocity.x = 0.0;
-
-		// left
-		if (IsKeyDown(KEY_D)) {
-			player->velocity.x = 120.0;			
-			player->direction = RIGHT;
-		}
-
-		// right
-		if (IsKeyDown(KEY_A)) {
-			player->velocity.x = -120.0;
-			player->direction = LEFT;
-		}
-	
-		// jump
-		if (IsKeyPressed(KEY_SPACE)) {
-			player->velocity.y = -360.0;
-		}
-	}
-
-
-	void apply_velocity(Frog *frog) {
-		frog->destinationPosition.x += frog->velocity.x * GetFrameTime();
-		frog->destinationPosition.y += frog->velocity.y * GetFrameTime();
-	}
-
-
-	// TODO: update 
-	// Vector2 frogPosition = { (float)GetScreenWidth()/2, (float)GetScreenHeight()/2 };
-
-
-	// frame width of individual textures in the frog sprite sheet
-	float frameWidth = (float)(frog.width / 8);
-
-	int maxFrames = (int)frog.width / (int)frameWidth;
-	float timer = 0.0f;
-	int frame = 0;
-
-	
-	// jump animation variables
-	bool isJumping = false;
-	float jumpTimer = 0.0f;
-	float jumpDuration = 1.9f; 
-
-	// sprite direction variables
-	// bool isFacingRight = false;
-
-	// add gravity and velocity
-	// make a struct for the frog that stores texture, position, velocity etc
-
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
-
 		// update 
-		apply_gravity(&player)
-		move_frog(&player)		
-		apply_velocity(&player)
+		apply_gravity(&froggy);
+		move_frog(&froggy, maxFrames);		
+		apply_velocity(&froggy);
 
 		  // if below ground, put back on ground
-    	if (player.destinationPosition.y > GetScreenHeight() - player.destinationPosition.height) {
-			player.destinationPosition.y = GetScreenHeight() - player.destinationPosition.height;
+    	if (froggy.destinationPosition.y > GetScreenHeight() - froggy.destinationPosition.height) {
+			froggy.destinationPosition.y = GetScreenHeight() - froggy.destinationPosition.height;
 		}
 
 		// drawing
 		BeginDrawing();
 
-		
-		
-		// side movement
-		// if (IsKeyDown(KEY_RIGHT)) {
-		// 	frogPosition.x += 2.0f;
-		// 	isFacingRight = true;
-		// }
-	    //     if (IsKeyDown(KEY_LEFT)) {
-		// 	frogPosition.x -= 2.0f;
-		// 	isFacingRight = false;
-		// }
-
-		// jump
-		// if (IsKeyPressed(KEY_SPACE)) {
-		// 	isJumping = true;
-
-		// 	if (isFacingRight) {
-		// 		// TODO: gradually update these values
-		// 		frogPosition.x += 100.0f;
-		// 		frogPosition.y -= 100.0f;
-		// 	}
-			
-		// 	if (isFacingRight == false) {
-		// 		frogPosition.x -= 100.0f;
-		// 		frogPosition.y -= 100.0f;
-		// 	}
-
-		// 	jumpTimer = jumpDuration;
-		// }
+		// debug 
+		DrawText(TextFormat("Frame: %d", froggy.frame), 10, 10, 20, WHITE);
+		DrawText(TextFormat("Is Jumping: %s", froggy.isJumping ? "true" : "false"), 10, 40, 20, WHITE);
+		DrawText(TextFormat("Frame Timer: %.2f", froggy.frameTimer), 10, 70, 20, WHITE);
+		DrawText(TextFormat("Jump Timer: %.2f", froggy.jumpTimer), 10, 100, 20, WHITE);
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
 		ClearBackground(BLACK);
 
-		// sprite animation timer
-		timer += GetFrameTime();
-
-		// jump animation frame variable for sprite selection
-		if (timer > 0.2f) {
-			timer = 0.0;
-			if (isJumping) {
-				frame++;
-				frame = frame % maxFrames;
-			}
-		}
-
-		// jump duration
-		if (isJumping) {
-			jumpTimer -= GetFrameTime();
-			if (jumpTimer < 0.0f) {
-				isJumping = false;
-				frame = 0;
-			}
-		}
+		
+		// float frogOffset = (froggy.direction == RIGHT) ? -frameWidth : 0; + frogOffset,
+		Vector2 frogPosition = { (float)froggy.destinationPosition.x, (float)froggy.destinationPosition.y };
 		
 		// draw frog
 		DrawTextureRec(
-			frog, 
+			froggy.texture, 
 			(Rectangle){
-				frameWidth * frame, 
+				frameWidth * froggy.frame, 
 				0, 
-				isFacingRight ? -frameWidth : frameWidth, 
-				(float)frog.height}, 
-			frogPosition, 
+				(froggy.direction == RIGHT) ? -frameWidth : frameWidth,				
+				(float)froggy.texture.height}, 
+				frogPosition, 
 			RAYWHITE);  
 
 		// end the frame and get ready for the next one  (display frame, poll input, etc...)
@@ -188,7 +168,7 @@ int main ()
 
 	// cleanup
 	// unload our texture so it can be cleaned up
-	UnloadTexture(frog);
+	UnloadTexture(frog_texture);
 
 	// destroy the window and cleanup the OpenGL context
 	CloseWindow();
