@@ -23,7 +23,7 @@
 
 	// gravity
 	void apply_gravity(Frog *froggy) {
-		froggy->velocity.y += 25.0;
+		froggy->velocity.y += 36.0;
 
 		if (froggy->velocity.y > 450.0) {
 			froggy->velocity.y = 450.0;
@@ -34,29 +34,38 @@
 	void move_frog(Frog *froggy, int maxFrames) {
     
 		const float frameDuration = 0.2f;  // Time per frame during jump
-		const float jumpDuration = 1.2f;   // Total jump duration
+		const float jumpDuration = 1.4f;   // Total jump duration
 
 		froggy->velocity.x = 0.0;
 
 		// side movement
 		if (IsKeyDown(KEY_D)) {
-			froggy->velocity.x = 120.0;
+			froggy->velocity.x = 200.0;
 			froggy->direction = RIGHT;
 		}
 
 		if (IsKeyDown(KEY_A)) {
-			froggy->velocity.x = -120.0;
+			froggy->velocity.x = -200.0;
 			froggy->direction = LEFT;
 		}
 
 		// jump (prevent double jumps)
 		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
-			froggy->velocity.y = -660.0;
+			froggy->velocity.y = -990.0;
+
+			if (froggy->direction == RIGHT) {
+				froggy->velocity.x = 360;
+			}
+
+			if (froggy->direction == LEFT) {
+				froggy->velocity.x = -360;
+			}
+			
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;
 
-			// start at third frame for more believable animation
-			froggy->frame = 3;          
+			// start at second/third frame for more believable jump animation
+			froggy->frame = 2;          
 			froggy->frameTimer = 0.0f;  
 		}
 		
@@ -103,8 +112,8 @@ int main ()
 	Frog froggy = (Frog){.texture = frog_texture,
 						.destinationPosition =
 							(Rectangle){
-								.x = 100.0,
-								.y = 0.0,
+								.x = 600.0,
+								.y = 800.0,
 								.width = 0.0,
 								.height = 36.0,
 							},						
