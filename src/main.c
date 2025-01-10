@@ -21,13 +21,13 @@ typedef struct Frog{
 	Rectangle destinationPosition;
 	Vector2 velocity;
 	Direction direction;
+	Rectangle hitbox;
+	float health;
 	//jump related variables
 	bool isJumping; 		
 	int frame;
 	float jumpTimer; 
-	float frameTimer; 		
-	// test purposes
-	int collision;
+	float frameTimer; 
 } Frog;
 
 // struct for killer bugs
@@ -36,6 +36,7 @@ typedef struct Bug{
 	Rectangle destinationPosition;
 	Vector2 velocity;
 	Direction direction;
+	Rectangle hitbox;
 	int frame;
 	// load progressively more bugs from off screen moving toward / circling around the frog getting ever nearer
 	// collision with frog tongue = KILL
@@ -62,7 +63,7 @@ void move_frog(Frog *froggy, int maxFrames) {
 	if (IsKeyDown(KEY_D)) {
 		if (froggy->isJumping) {
 			// faster side movement in mid-air
-			froggy->velocity.x = 340.0;			
+			froggy->velocity.x = 380.0;			
 		} else {
 			froggy->velocity.x = 200.0;			
 		}				
@@ -71,7 +72,7 @@ void move_frog(Frog *froggy, int maxFrames) {
 
 	if (IsKeyDown(KEY_A)) {
 		if (froggy->isJumping) {
-			froggy->velocity.x = -340.0;
+			froggy->velocity.x = -380.0;
 		} else {
 			froggy->velocity.x = -200.0;
 		}				
@@ -80,17 +81,7 @@ void move_frog(Frog *froggy, int maxFrames) {
 
 	// jump (prevent double jumps)
 	if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
-		froggy->velocity.y = -1100.0;
-
-		// this does nothing ↓
-		// if (froggy->direction == RIGHT) {
-		// 	froggy->velocity.x = 760;
-		// }
-
-		// if (froggy->direction == LEFT) {
-		// 	froggy->velocity.x = -760;
-		// }
-		
+		froggy->velocity.y = -1100.0;		
 		froggy->isJumping = true;
 		froggy->jumpTimer = jumpDuration;
 
@@ -131,10 +122,9 @@ void apply_velocity(Frog *froggy) {
 
 // collision
 void collision_check(Frog *froggy, Bug *mosquito) {
-	
+
 	// frog hitbox
 	Rectangle frog_hitbox = (Rectangle){
-
       .x = froggy->destinationPosition.x + 10.0f,
       .y = froggy->destinationPosition.y + 1.0f,
       .width = 35.0f,
@@ -149,12 +139,12 @@ void collision_check(Frog *froggy, Bug *mosquito) {
       .height = 50.0f	  
   	};
 
-	// debugging: visual hitboxes
-	DrawRectangleLinesEx(frog_hitbox, 1, GREEN); 
-	DrawRectangleLinesEx(bug_hitbox, 1, RED);   
+	// store the hitboxes
+	froggy->hitbox = frog_hitbox;
+	mosquito->hitbox = bug_hitbox;
 
-	if (CheckCollisionRecs(frog_hitbox, bug_hitbox)) {
-		froggy->collision++;
+	if (CheckCollisionRecs(froggy->hitbox, mosquito->hitbox)) {
+		froggy->health -= 1.8;
 	}
 }
 
@@ -183,8 +173,7 @@ int main () {
 						.isJumping = false,
 						.frame = 0,
 						.jumpTimer = 0.0f,   
-    					.frameTimer = 0.0f,
-						.collision = 0};
+    					.frameTimer = 0.0f};
 
 	Texture2D mosquitoTexture = LoadTexture("bug.png");
 
@@ -233,7 +222,10 @@ int main () {
 		DrawText(TextFormat("Is Jumping: %s", froggy.isJumping ? "true" : "false"), 10, 40, 20, WHITE);
 		DrawText(TextFormat("Frame Timer: %.2f", froggy.frameTimer), 10, 70, 20, WHITE);
 		DrawText(TextFormat("Jump Timer: %.2f", froggy.jumpTimer), 10, 100, 20, WHITE);
-		DrawText(TextFormat("Collisions: %.2f", froggy.collision), 10, 130, 20, WHITE);
+		DrawText(TextFormat("Health: %.2f", froggy.health), 10, 130, 20, WHITE);
+		// debugging: visual hitboxes
+		DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 
+		DrawRectangleLinesEx(mosquito.hitbox, 1, RED);   
 
 
 		
