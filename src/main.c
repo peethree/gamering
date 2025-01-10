@@ -3,17 +3,21 @@
 #include "resource_dir.h"	
 
 // TODO: 
-// collision 
-// SOMETHING TO COLLIDE WITH (GAMING) KiLLeR BuGS
+// more BUGS 
+// bug movement
 // big tongue shooting out at bugs?
 // scoreboard
-
 
 // keep track of direction
 typedef enum Direction {
 	LEFT = -1,
 	RIGHT = 1,
 } Direction;
+
+typedef enum Life{
+	YES = 1,
+	NO = -1,
+} Life;
 
 // struct for frog sprite
 typedef struct Frog{
@@ -23,6 +27,7 @@ typedef struct Frog{
 	Direction direction;
 	Rectangle hitbox;
 	float health;
+	Life alive;
 	//jump related variables
 	bool isJumping; 		
 	int frame;
@@ -144,7 +149,15 @@ void collision_check(Frog *froggy, Bug *mosquito) {
 	mosquito->hitbox = bug_hitbox;
 
 	if (CheckCollisionRecs(froggy->hitbox, mosquito->hitbox)) {
-		froggy->health -= 1.8;
+		if (froggy->health >= 0.0) {
+		froggy->health -= 1.8;	
+		}
+
+		// health cannot go below 0
+		if (froggy->health <= 0) {
+			froggy->health = 0;
+			froggy->alive = NO;			
+		}
 	}
 }
 
@@ -173,7 +186,9 @@ int main () {
 						.isJumping = false,
 						.frame = 0,
 						.jumpTimer = 0.0f,   
-    					.frameTimer = 0.0f};
+    					.frameTimer = 0.0f,
+						.health = 100.0,
+						.alive = YES};
 
 	Texture2D mosquitoTexture = LoadTexture("bug.png");
 
@@ -238,16 +253,21 @@ int main () {
 			(float)froggy.destinationPosition.y 
 		};
 		
+		
 		// draw frog
 		DrawTextureRec(
 			froggy.texture, 
 			(Rectangle){
 				frameWidth * froggy.frame, 
 				0, 
-				(froggy.direction == RIGHT) ? -frameWidth : frameWidth,				
-				(float)froggy.texture.height}, 
+				// flip the texture horizontally depending on direction it's facing
+				(froggy.direction == RIGHT) ? -frameWidth : frameWidth,	
+				// flip the texture vertically when the frog is dead			
+				froggy.texture.height * froggy.alive}, 
 			frogPosition, 
-			RAYWHITE);  
+			// change color based on whether alive or not
+			(froggy.alive == YES) ? RAYWHITE : RED);
+			 
 
 		Vector2 mosquitoPosition = { 
 			(float)mosquito.destinationPosition.x, 
@@ -261,14 +281,14 @@ int main () {
 				frameWidthBug * mosquito.frame,
 				0,
 				(mosquito.direction == RIGHT) ? -frameWidthBug : frameWidthBug,
-				(float)mosquito.texture.height},
+				mosquito.texture.height},
 			mosquitoPosition,
 			RAYWHITE);		
 		
 
 		// draw platforms		
-		DrawCircle(250, 500, 300.0, RED);
-		DrawLine(250, 500, 950, 500, RED);
+		// DrawCircle(250, 500, 300.0, RED);
+		// DrawLine(250, 500, 950, 500, RED);
 		// DrawRectangle(600, 600, 260, 36, RED);		
 
 		// end the frame and get ready for the next one (display frame, poll input, etc...)
