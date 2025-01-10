@@ -50,33 +50,43 @@ void apply_gravity(Frog *froggy) {
 // movement	
 void move_frog(Frog *froggy, int maxFrames) {
 
-	const float frameDuration = 0.2f;  
+	const float frameDuration = 0.25f;  
 	const float jumpDuration = 1.4f;   
 
 	froggy->velocity.x = 0.0;
 
 	// side movement
 	if (IsKeyDown(KEY_D)) {
-		froggy->velocity.x = 200.0;
+		if (froggy->isJumping) {
+			// faster side movement in mid-air
+			froggy->velocity.x = 340.0;			
+		} else {
+			froggy->velocity.x = 200.0;			
+		}				
 		froggy->direction = RIGHT;
 	}
 
 	if (IsKeyDown(KEY_A)) {
-		froggy->velocity.x = -200.0;
+		if (froggy->isJumping) {
+			froggy->velocity.x = -340.0;
+		} else {
+			froggy->velocity.x = -200.0;
+		}				
 		froggy->direction = LEFT;
 	}
 
 	// jump (prevent double jumps)
 	if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
-		froggy->velocity.y = -990.0;
+		froggy->velocity.y = -1100.0;
 
-		if (froggy->direction == RIGHT) {
-			froggy->velocity.x = 360;
-		}
+		// this does nothing ↓
+		// if (froggy->direction == RIGHT) {
+		// 	froggy->velocity.x = 760;
+		// }
 
-		if (froggy->direction == LEFT) {
-			froggy->velocity.x = -360;
-		}
+		// if (froggy->direction == LEFT) {
+		// 	froggy->velocity.x = -760;
+		// }
 		
 		froggy->isJumping = true;
 		froggy->jumpTimer = jumpDuration;
@@ -116,6 +126,23 @@ void apply_velocity(Frog *froggy) {
 	froggy->destinationPosition.y += froggy->velocity.y * GetFrameTime();
 }	
 
+// collision
+void collision_check(Frog *froggy) {
+	//
+}
+
+// frog hitbox
+Rectangle frog_hitbox(Frog *froggy) {
+	  return (Rectangle){
+      .x = froggy->destinationPosition.x + 14.0f,
+      .y = froggy->destinationPosition.y + 14.0f,
+      .width = 35.0f,
+      .height = 25.0f	  
+  };
+}
+
+
+
 int main () {	
 	// Tell the window to use vsync and work on high DPI displays
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
@@ -143,7 +170,19 @@ int main () {
 						.jumpTimer = 0.0f,   
     					.frameTimer = 0.0f};
 
+	// TODO: add sprite
+	Texture2D mosquitoTexture = LoadTexture("mosquito.png");
 
+	Bug mosquito = (Bug){.texture = mosquitoTexture,
+						.destinationPosition = 
+							(Rectangle){
+								.x = 600.0,
+								.y = 400.0,
+								.width = 0.0,
+								.height = 36.0,
+							},	
+						.direction = LEFT};	
+					
  
 	// debug logging
 	SetTraceLogLevel(LOG_INFO);  
@@ -169,17 +208,18 @@ int main () {
 		BeginDrawing();
 
 		// debug 
-		// DrawText(TextFormat("Frame: %d", froggy.frame), 10, 10, 20, WHITE);
-		// DrawText(TextFormat("Is Jumping: %s", froggy.isJumping ? "true" : "false"), 10, 40, 20, WHITE);
-		// DrawText(TextFormat("Frame Timer: %.2f", froggy.frameTimer), 10, 70, 20, WHITE);
-		// DrawText(TextFormat("Jump Timer: %.2f", froggy.jumpTimer), 10, 100, 20, WHITE);
+		DrawText(TextFormat("Frame: %d", froggy.frame), 10, 10, 20, WHITE);
+		DrawText(TextFormat("Is Jumping: %s", froggy.isJumping ? "true" : "false"), 10, 40, 20, WHITE);
+		DrawText(TextFormat("Frame Timer: %.2f", froggy.frameTimer), 10, 70, 20, WHITE);
+		DrawText(TextFormat("Jump Timer: %.2f", froggy.jumpTimer), 10, 100, 20, WHITE);
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
 		ClearBackground(BLACK);
-
 		
-		// float frogOffset = (froggy.direction == RIGHT) ? -frameWidth : 0; + frogOffset,
-		Vector2 frogPosition = { (float)froggy.destinationPosition.x, (float)froggy.destinationPosition.y };
+		Vector2 frogPosition = { 
+			(float)froggy.destinationPosition.x, 
+			(float)froggy.destinationPosition.y 
+		};
 		
 		// draw frog
 		DrawTextureRec(
@@ -189,21 +229,39 @@ int main () {
 				0, 
 				(froggy.direction == RIGHT) ? -frameWidth : frameWidth,				
 				(float)froggy.texture.height}, 
-				frogPosition, 
+			frogPosition, 
 			RAYWHITE);  
+
+		Vector2 mosquitoPosition = { 
+			(float)mosquito.destinationPosition.x, 
+			(float)mosquito.destinationPosition.y 
+		};
+
+		// draw mosquito(s)
+		DrawTextureRec(
+			mosquito.texture,
+			(Rectangle){
+				0,
+				0,
+				mosquito.texture.width,
+				mosquito.texture.height},
+				mosquitoPosition,
+				RAYWHITE);		
+		
 
 		// draw platforms		
 		DrawCircle(250, 500, 300.0, RED);
 		DrawLine(250, 500, 950, 500, RED);
 		DrawRectangle(600, 600, 260, 36, RED);		
 
-		// end the frame and get ready for the next one  (display frame, poll input, etc...)
+		// end the frame and get ready for the next one (display frame, poll input, etc...)
 		EndDrawing();
 	}
 
 	// cleanup
 	// unload our texture so it can be cleaned up
 	UnloadTexture(frog_texture);
+	// UnloadTexture(mosquito.png);	
 
 	// destroy the window and cleanup the OpenGL context
 	CloseWindow();
