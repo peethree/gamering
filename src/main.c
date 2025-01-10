@@ -26,6 +26,8 @@ typedef struct Frog{
 	int frame;
 	float jumpTimer; 
 	float frameTimer; 		
+	// test purposes
+	int collision;
 } Frog;
 
 // struct for killer bugs
@@ -34,6 +36,7 @@ typedef struct Bug{
 	Rectangle destinationPosition;
 	Vector2 velocity;
 	Direction direction;
+	int frame;
 	// load progressively more bugs from off screen moving toward / circling around the frog getting ever nearer
 	// collision with frog tongue = KILL
 } Bug;
@@ -127,21 +130,33 @@ void apply_velocity(Frog *froggy) {
 }	
 
 // collision
-void collision_check(Frog *froggy) {
-	//
-}
+void collision_check(Frog *froggy, Bug *mosquito) {
+	
+	// frog hitbox
+	Rectangle frog_hitbox = (Rectangle){
 
-// frog hitbox
-Rectangle frog_hitbox(Frog *froggy) {
-	  return (Rectangle){
-      .x = froggy->destinationPosition.x + 14.0f,
-      .y = froggy->destinationPosition.y + 14.0f,
+      .x = froggy->destinationPosition.x + 10.0f,
+      .y = froggy->destinationPosition.y + 1.0f,
       .width = 35.0f,
-      .height = 25.0f	  
-  };
+      .height = 35.0f	  
+  	};
+
+	// mosquito hitbox
+	Rectangle bug_hitbox = (Rectangle){
+      .x = mosquito->destinationPosition.x + 13.0f,
+      .y = mosquito->destinationPosition.y + 1.0f,
+      .width = 50.0f,
+      .height = 50.0f	  
+  	};
+
+	// debugging: visual hitboxes
+	DrawRectangleLinesEx(frog_hitbox, 1, GREEN); 
+	DrawRectangleLinesEx(bug_hitbox, 1, RED);   
+
+	if (CheckCollisionRecs(frog_hitbox, bug_hitbox)) {
+		froggy->collision++;
+	}
 }
-
-
 
 int main () {	
 	// Tell the window to use vsync and work on high DPI displays
@@ -168,28 +183,33 @@ int main () {
 						.isJumping = false,
 						.frame = 0,
 						.jumpTimer = 0.0f,   
-    					.frameTimer = 0.0f};
+    					.frameTimer = 0.0f,
+						.collision = 0};
 
-	// TODO: add sprite
-	Texture2D mosquitoTexture = LoadTexture("mosquito.png");
+	Texture2D mosquitoTexture = LoadTexture("bug.png");
 
 	Bug mosquito = (Bug){.texture = mosquitoTexture,
 						.destinationPosition = 
 							(Rectangle){
 								.x = 600.0,
-								.y = 400.0,
+								.y = 500.0,
 								.width = 0.0,
 								.height = 36.0,
 							},	
-						.direction = LEFT};	
+						.direction = LEFT,
+						.frame = 0};	
 					
  
 	// debug logging
 	SetTraceLogLevel(LOG_INFO);  
 
-	// 8 pictures on the sprite sheet -> 
+	// 8 pictures on the frog sprite sheet -> 
 	const float frameWidth = (float)(frog_texture.width / 8);
 	const int maxFrames = (int)frog_texture.width / (int)frameWidth;
+
+	// mosquito (only 2 for directions)
+	const float frameWidthBug = (float)(mosquitoTexture.width / 2);
+	
 	
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
@@ -198,6 +218,7 @@ int main () {
 		apply_gravity(&froggy);
 		move_frog(&froggy, maxFrames);		
 		apply_velocity(&froggy);
+		collision_check(&froggy, &mosquito);
 
 		  // if below ground, put back on ground
     	if (froggy.destinationPosition.y > GetScreenHeight() - froggy.destinationPosition.height) {
@@ -212,6 +233,10 @@ int main () {
 		DrawText(TextFormat("Is Jumping: %s", froggy.isJumping ? "true" : "false"), 10, 40, 20, WHITE);
 		DrawText(TextFormat("Frame Timer: %.2f", froggy.frameTimer), 10, 70, 20, WHITE);
 		DrawText(TextFormat("Jump Timer: %.2f", froggy.jumpTimer), 10, 100, 20, WHITE);
+		DrawText(TextFormat("Collisions: %.2f", froggy.collision), 10, 130, 20, WHITE);
+
+
+		
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
 		ClearBackground(BLACK);
@@ -241,18 +266,18 @@ int main () {
 		DrawTextureRec(
 			mosquito.texture,
 			(Rectangle){
+				frameWidthBug * mosquito.frame,
 				0,
-				0,
-				mosquito.texture.width,
-				mosquito.texture.height},
-				mosquitoPosition,
-				RAYWHITE);		
+				(mosquito.direction == RIGHT) ? -frameWidthBug : frameWidthBug,
+				(float)mosquito.texture.height},
+			mosquitoPosition,
+			RAYWHITE);		
 		
 
 		// draw platforms		
 		DrawCircle(250, 500, 300.0, RED);
 		DrawLine(250, 500, 950, 500, RED);
-		DrawRectangle(600, 600, 260, 36, RED);		
+		// DrawRectangle(600, 600, 260, 36, RED);		
 
 		// end the frame and get ready for the next one (display frame, poll input, etc...)
 		EndDrawing();
