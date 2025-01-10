@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include <math.h>
 
 #include "resource_dir.h"	
 
@@ -14,20 +15,20 @@ typedef enum Direction {
 	RIGHT = 1,
 } Direction;
 
-typedef enum Life{
-	YES = 1,
-	NO = -1,
-} Life;
+typedef enum Status{
+	ALIVE = 1,
+	DEAD = -1,
+} Status;
 
 // struct for frog sprite
 typedef struct Frog{
 	Texture2D texture;		
-	Rectangle destinationPosition;
+	Rectangle position;
 	Vector2 velocity;
 	Direction direction;
 	Rectangle hitbox;
 	float health;
-	Life alive;
+	Status alive;
 	//jump related variables
 	bool isJumping; 		
 	int frame;
@@ -38,16 +39,24 @@ typedef struct Frog{
 // struct for killer bugs
 typedef struct Bug{
 	Texture2D texture;
-	Rectangle destinationPosition;
+	Rectangle position;
 	Vector2 velocity;
 	Direction direction;
 	Rectangle hitbox;
 	int frame;
+	// bug movement
+	float angle;
+	float radius;
+	float spiralSpeed;
+	float convergence;
+	// minimum distance from player
+	float minRadius; 
+
 	// load progressively more bugs from off screen moving toward / circling around the frog getting ever nearer
 	// collision with frog tongue = KILL
 } Bug;
 
-// gravity
+// gravity frog
 void apply_gravity(Frog *froggy) {
 	froggy->velocity.y += 36.0;
 
@@ -56,7 +65,7 @@ void apply_gravity(Frog *froggy) {
 	}
 }
 
-// movement	
+// movement	frog
 void move_frog(Frog *froggy, int maxFrames) {
 
 	const float frameDuration = 0.25f;  
@@ -64,65 +73,91 @@ void move_frog(Frog *froggy, int maxFrames) {
 
 	froggy->velocity.x = 0.0;
 
-	// side movement
-	if (IsKeyDown(KEY_D)) {
-		if (froggy->isJumping) {
-			// faster side movement in mid-air
-			froggy->velocity.x = 380.0;			
-		} else {
-			froggy->velocity.x = 200.0;			
-		}				
-		froggy->direction = RIGHT;
-	}
+	if (froggy->alive == ALIVE) {
+		// side movement
+		if (IsKeyDown(KEY_D)) {
+			if (froggy->isJumping) {
+				// faster side movement in mid-air
+				froggy->velocity.x = 380.0;			
+			} else {
+				froggy->velocity.x = 200.0;			
+			}				
+			froggy->direction = RIGHT;
+		}
 
-	if (IsKeyDown(KEY_A)) {
-		if (froggy->isJumping) {
-			froggy->velocity.x = -380.0;
-		} else {
-			froggy->velocity.x = -200.0;
-		}				
-		froggy->direction = LEFT;
-	}
+		if (IsKeyDown(KEY_A)) {
+			if (froggy->isJumping) {
+				froggy->velocity.x = -380.0;
+			} else {
+				froggy->velocity.x = -200.0;
+			}				
+			froggy->direction = LEFT;
+		}
 
-	// jump (prevent double jumps)
-	if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
-		froggy->velocity.y = -1100.0;		
-		froggy->isJumping = true;
-		froggy->jumpTimer = jumpDuration;
+		// jump (prevent double jumps)
+		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
+			froggy->velocity.y = -1100.0;		
+			froggy->isJumping = true;
+			froggy->jumpTimer = jumpDuration;
 
-		// start at second/third frame for more believable jump animation
-		froggy->frame = 2;          
-		froggy->frameTimer = 0.0f;  
-	}
-	
-	if (froggy->isJumping) {			
-		froggy->frameTimer += GetFrameTime();
-		
-		if (froggy->frameTimer >= frameDuration) {
-			froggy->frameTimer = 0.0f;
-			froggy->frame++;
-			// cycling frames, result being jump animation
-			froggy->frame %= maxFrames; 
+			// start at second/third frame for more believable jump animation
+			froggy->frame = 2;          
+			froggy->frameTimer = 0.0f;  
 		}
 		
-		// countdown jumptimer to 0
-		froggy->jumpTimer -= GetFrameTime();
-		if (froggy->jumpTimer <= 0.0f) {
-			froggy->jumpTimer = 0.0f; 
+		if (froggy->isJumping) {			
+			froggy->frameTimer += GetFrameTime();
+			
+			if (froggy->frameTimer >= frameDuration) {
+				froggy->frameTimer = 0.0f;
+				froggy->frame++;
+				// cycling frames, result being jump animation
+				froggy->frame %= maxFrames; 
+			}
+			
+			// countdown jumptimer to 0
+			froggy->jumpTimer -= GetFrameTime();
+			if (froggy->jumpTimer <= 0.0f) {
+				froggy->jumpTimer = 0.0f; 
 
-			// reset jump status
-			froggy->isJumping = false;
+				// reset jump status
+				froggy->isJumping = false;
 
-			// resting frog texture
-			froggy->frame = 0;       
+				// resting frog texture
+				froggy->frame = 0;       
+			}
 		}
 	}
 }	
 
+// movement bug
+void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {
+	
+	// update angle
+	mosquito->angle += mosquito->spiralSpeed * deltaTime;
+
+	// decrease radius
+	if (mosquito->radius > mosquito->minRadius) {
+		mosquito->radius -= mosquito->convergence * deltaTime;
+	}
+
+	// convert radius, angle -> x, y
+	float mosquito_x = mosquito->radius * cosf(mosquito->angle); 
+	float mosquito_y = mosquito->radius * sinf(mosquito->angle);
+
+
+	// update position 
+	mosquito->position.x = froggy->position.x + mosquito_x;
+	mosquito->position.y = froggy->position.y + mosquito_y;
+	
+		// if +x flip frame right, if -x flip frame pointing left
+
+}
+
 // velocity
 void apply_velocity(Frog *froggy) {
-	froggy->destinationPosition.x += froggy->velocity.x * GetFrameTime();
-	froggy->destinationPosition.y += froggy->velocity.y * GetFrameTime();
+	froggy->position.x += froggy->velocity.x * GetFrameTime();
+	froggy->position.y += froggy->velocity.y * GetFrameTime();
 }	
 
 // collision
@@ -130,16 +165,16 @@ void collision_check(Frog *froggy, Bug *mosquito) {
 
 	// frog hitbox
 	Rectangle frog_hitbox = (Rectangle){
-      .x = froggy->destinationPosition.x + 10.0f,
-      .y = froggy->destinationPosition.y + 1.0f,
+      .x = froggy->position.x + 10.0f,
+      .y = froggy->position.y + 1.0f,
       .width = 35.0f,
       .height = 35.0f	  
   	};
 
 	// mosquito hitbox
 	Rectangle bug_hitbox = (Rectangle){
-      .x = mosquito->destinationPosition.x + 13.0f,
-      .y = mosquito->destinationPosition.y + 1.0f,
+      .x = mosquito->position.x + 13.0f,
+      .y = mosquito->position.y + 1.0f,
       .width = 50.0f,
       .height = 50.0f	  
   	};
@@ -153,10 +188,11 @@ void collision_check(Frog *froggy, Bug *mosquito) {
 		froggy->health -= 1.8;	
 		}
 
-		// health cannot go below 0
+		// frog dies when health goes to 0 . . . .
 		if (froggy->health <= 0) {
 			froggy->health = 0;
-			froggy->alive = NO;			
+			froggy->alive = DEAD;	
+			froggy->frame = 5;		
 		}
 	}
 }
@@ -174,8 +210,9 @@ int main () {
 
 	Texture2D frog_texture = LoadTexture("frog.png");	
 
+	// initialize froggy
 	Frog froggy = (Frog){.texture = frog_texture,
-						.destinationPosition =
+						.position =
 							(Rectangle){
 								.x = 600.0,
 								.y = 800.0,
@@ -188,12 +225,13 @@ int main () {
 						.jumpTimer = 0.0f,   
     					.frameTimer = 0.0f,
 						.health = 100.0,
-						.alive = YES};
+						.alive = ALIVE};
 
-	Texture2D mosquitoTexture = LoadTexture("bug.png");
+	Texture2D mosquito_texture = LoadTexture("bug.png");
 
-	Bug mosquito = (Bug){.texture = mosquitoTexture,
-						.destinationPosition = 
+	// initialize bug
+	Bug mosquito = (Bug){.texture = mosquito_texture,
+						.position = 
 							(Rectangle){
 								.x = 600.0,
 								.y = 500.0,
@@ -201,18 +239,22 @@ int main () {
 								.height = 36.0,
 							},	
 						.direction = LEFT,
-						.frame = 0};	
-					
+						.frame = 0,
+						.angle = 0.0f,
+						.radius = 400.0f,
+						.spiralSpeed = 2.0f,
+						.convergence = 32.0f,
+						.minRadius = 3.0f};						
  
 	// debug logging
-	SetTraceLogLevel(LOG_INFO);  
+	// SetTraceLogLevel(LOG_INFO);  
 
 	// 8 pictures on the frog sprite sheet -> 
 	const float frameWidth = (float)(frog_texture.width / 8);
 	const int maxFrames = (int)frog_texture.width / (int)frameWidth;
 
 	// mosquito (only 2 for directions)
-	const float frameWidthBug = (float)(mosquitoTexture.width / 2);
+	const float frameWidthBug = (float)(mosquito_texture.width / 2);
 	
 	
 	// game loop
@@ -220,13 +262,14 @@ int main () {
 	{
 		// update 
 		apply_gravity(&froggy);
-		move_frog(&froggy, maxFrames);		
+		move_frog(&froggy, maxFrames);	
+		move_bug(&mosquito, &froggy, GetFrameTime());	
 		apply_velocity(&froggy);
 		collision_check(&froggy, &mosquito);
 
 		  // if below ground, put back on ground
-    	if (froggy.destinationPosition.y > GetScreenHeight() - froggy.destinationPosition.height) {
-			froggy.destinationPosition.y = GetScreenHeight() - froggy.destinationPosition.height;
+    	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
+			froggy.position.y = GetScreenHeight() - froggy.position.height;
 		}
 
 		// drawing
@@ -238,22 +281,23 @@ int main () {
 		DrawText(TextFormat("Frame Timer: %.2f", froggy.frameTimer), 10, 70, 20, WHITE);
 		DrawText(TextFormat("Jump Timer: %.2f", froggy.jumpTimer), 10, 100, 20, WHITE);
 		DrawText(TextFormat("Health: %.2f", froggy.health), 10, 130, 20, WHITE);
+		DrawText(TextFormat("Status: %d", froggy.alive), 10, 160, 20, WHITE);
+
+		if (froggy.alive == DEAD) {
+			DrawText("FROGGY HAS PERISHED", 400, 400, 42, RED);
+		}
 		// debugging: visual hitboxes
-		DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 
-		DrawRectangleLinesEx(mosquito.hitbox, 1, RED);   
-
-
-		
+		// DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 
+		// DrawRectangleLinesEx(mosquito.hitbox, 1, RED);   		
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
 		ClearBackground(BLACK);
 		
 		Vector2 frogPosition = { 
-			(float)froggy.destinationPosition.x, 
-			(float)froggy.destinationPosition.y 
+			(float)froggy.position.x, 
+			(float)froggy.position.y 
 		};
-		
-		
+				
 		// draw frog
 		DrawTextureRec(
 			froggy.texture, 
@@ -266,12 +310,12 @@ int main () {
 				froggy.texture.height * froggy.alive}, 
 			frogPosition, 
 			// change color based on whether alive or not
-			(froggy.alive == YES) ? RAYWHITE : RED);
+			(froggy.alive == ALIVE) ? RAYWHITE : RED);
 			 
 
 		Vector2 mosquitoPosition = { 
-			(float)mosquito.destinationPosition.x, 
-			(float)mosquito.destinationPosition.y 
+			(float)mosquito.position.x, 
+			(float)mosquito.position.y 
 		};
 
 		// draw mosquito(s)
@@ -283,8 +327,7 @@ int main () {
 				(mosquito.direction == RIGHT) ? -frameWidthBug : frameWidthBug,
 				mosquito.texture.height},
 			mosquitoPosition,
-			RAYWHITE);		
-		
+			RAYWHITE);				
 
 		// draw platforms		
 		// DrawCircle(250, 500, 300.0, RED);
@@ -296,9 +339,9 @@ int main () {
 	}
 
 	// cleanup
-	// unload our texture so it can be cleaned up
+	// unload our textures so it can be cleaned up
 	UnloadTexture(frog_texture);
-	// UnloadTexture(mosquito.png);	
+	UnloadTexture(mosquito_texture);	
 
 	// destroy the window and cleanup the OpenGL context
 	CloseWindow();
