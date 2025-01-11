@@ -5,7 +5,6 @@
 
 // TODO: 
 // more BUGS 
-// bug movement
 // big tongue shooting out at bugs?
 // scoreboard
 
@@ -29,12 +28,15 @@ typedef struct Frog{
 	Rectangle hitbox;
 	float health;
 	Status alive;
-	//jump related variables
+	//jump related variables	
 	bool isJumping; 		
 	int frame;
 	float jumpTimer; 
 	float frameTimer; 
 } Frog;
+
+// max mosquitos
+#define MAX_BUGS 50
 
 // struct for killer bugs
 typedef struct Bug{
@@ -45,6 +47,7 @@ typedef struct Bug{
 	Rectangle hitbox;
 	int frame;
 	// bug movement
+	Rectangle previousPosition;
 	float angle;
 	float radius;
 	float spiralSpeed;
@@ -98,7 +101,7 @@ void move_frog(Frog *froggy, int maxFrames) {
 		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
 			froggy->velocity.y = -1100.0;		
 			froggy->isJumping = true;
-			froggy->jumpTimer = jumpDuration;
+			froggy->jumpTimer = jumpDuration;			
 
 			// start at second/third frame for more believable jump animation
 			froggy->frame = 2;          
@@ -131,27 +134,37 @@ void move_frog(Frog *froggy, int maxFrames) {
 }	
 
 // movement bug
-void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {
-	
+void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {	
 	// update angle
 	mosquito->angle += mosquito->spiralSpeed * deltaTime;
 
 	// decrease radius
 	if (mosquito->radius > mosquito->minRadius) {
 		mosquito->radius -= mosquito->convergence * deltaTime;
+		// increase the convergence over time
+		mosquito->convergence += 0.1;
 	}
 
 	// convert radius, angle -> x, y
 	float mosquito_x = mosquito->radius * cosf(mosquito->angle); 
 	float mosquito_y = mosquito->radius * sinf(mosquito->angle);
 
+	// keep track of previous position
+	mosquito->previousPosition = mosquito->position;
 
-	// update position 
+	// update position 	
 	mosquito->position.x = froggy->position.x + mosquito_x;
-	mosquito->position.y = froggy->position.y + mosquito_y;
-	
-		// if +x flip frame right, if -x flip frame pointing left
+	mosquito->position.y = froggy->position.y + mosquito_y;	
 
+	
+	// if horizontal movement is +x flip frame right, if -x flip frame pointing left
+	float dif = mosquito->position.x - mosquito->previousPosition.x;
+
+	if (dif > 0.0) {
+		mosquito->frame = 1;
+	} else {
+		mosquito->frame = 0;
+	}
 }
 
 // velocity
@@ -197,6 +210,19 @@ void collision_check(Frog *froggy, Bug *mosquito) {
 	}
 }
 
+void spawn_bug(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {	
+	// initialize bug
+    mosquito->texture = mosquito_texture;
+    mosquito->position = (Rectangle){froggy->position.x, froggy->position.y - 200.0f, 0.0f, 36.0f};
+    mosquito->direction = LEFT;
+    mosquito->frame = 0;
+    mosquito->angle = 0.0f;
+    mosquito->radius = 500.0f;
+    mosquito->spiralSpeed = 2.0f;
+    mosquito->convergence = 15.0f;
+    mosquito->minRadius = 3.0f;
+}
+
 int main () {	
 	// Tell the window to use vsync and work on high DPI displays
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
@@ -227,47 +253,70 @@ int main () {
 						.health = 100.0,
 						.alive = ALIVE};
 
-	Texture2D mosquito_texture = LoadTexture("bug.png");
+	
+
+
+
 
 	// initialize bug
-	Bug mosquito = (Bug){.texture = mosquito_texture,
-						.position = 
-							(Rectangle){
-								.x = 600.0,
-								.y = 500.0,
-								.width = 0.0,
-								.height = 36.0,
-							},	
-						.direction = LEFT,
-						.frame = 0,
-						.angle = 0.0f,
-						.radius = 400.0f,
-						.spiralSpeed = 2.0f,
-						.convergence = 32.0f,
-						.minRadius = 3.0f};						
- 
-	// debug logging
-	// SetTraceLogLevel(LOG_INFO);  
+	// Bug mosquito = (Bug){.texture = mosquito_texture,
+	// 					.position = 
+	// 						(Rectangle){
+	// 							.x = 600.0,
+	// 							.y = 500.0,
+	// 							.width = 0.0,
+	// 							.height = 36.0,
+	// 						},	
+	// 					.direction = LEFT,
+	// 					.frame = 0,
+	// 					.angle = 0.0f,
+	// 					.radius = 500.0f,
+	// 					.spiralSpeed = 2.0f,
+	// 					.convergence = 15.0f,
+	// 					.minRadius = 3.0f};						
 
 	// 8 pictures on the frog sprite sheet -> 
 	const float frameWidth = (float)(frog_texture.width / 8);
 	const int maxFrames = (int)frog_texture.width / (int)frameWidth;
 
+	Texture2D mosquito_texture = LoadTexture("bug.png");
+
 	// mosquito (only 2 for directions)
 	const float frameWidthBug = (float)(mosquito_texture.width / 2);
-	
+
+	// array of mosquitoes
+	Bug mosquitoes[MAX_BUGS];
+	int activeBugs = 0;
+
+	// bug spawntimer
+	float bugSpawnTimer = 0.0f;	
+	const float bugSpawnInterval = 1.5f;
 	
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
+		float deltaTime = GetFrameTime();
+		
+		// Spawn new mosquito if the timer exceeds the interval
+   		bugSpawnTimer += deltaTime;
+
+		if (bugSpawnTimer >= bugSpawnInterval && activeBugs < MAX_BUGS) {
+			spawn_bug(&mosquitoes[activeBugs], &froggy, mosquito_texture);
+			activeBugs++;
+			bugSpawnTimer = 0.0f;
+		}
+
 		// update 
 		apply_gravity(&froggy);
 		move_frog(&froggy, maxFrames);	
-		move_bug(&mosquito, &froggy, GetFrameTime());	
-		apply_velocity(&froggy);
-		collision_check(&froggy, &mosquito);
+		apply_velocity(&froggy);		
 
-		  // if below ground, put back on ground
+		for (int i = 0; i < activeBugs; i++) {
+			move_bug(&mosquitoes[i], &froggy, GetFrameTime());
+			collision_check(&froggy, &mosquitoes[i]);	
+		}			
+
+		// if below ground, put back on ground
     	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
 			froggy.position.y = GetScreenHeight() - froggy.position.height;
 		}
@@ -313,22 +362,23 @@ int main () {
 			(froggy.alive == ALIVE) ? RAYWHITE : RED);
 			 
 
-		Vector2 mosquitoPosition = { 
-			(float)mosquito.position.x, 
-			(float)mosquito.position.y 
-		};
-
-		// draw mosquito(s)
-		DrawTextureRec(
-			mosquito.texture,
-			(Rectangle){
-				frameWidthBug * mosquito.frame,
-				0,
-				(mosquito.direction == RIGHT) ? -frameWidthBug : frameWidthBug,
-				mosquito.texture.height},
-			mosquitoPosition,
-			RAYWHITE);				
-
+		for (int i = 0; i < activeBugs; i++) {
+			Vector2 mosquitoPosition = { 
+				(float)mosquitoes[i].position.x, 
+				(float)mosquitoes[i].position.y
+			};
+					
+			// draw mosquito(s)
+			DrawTextureRec(
+				mosquitoes[i].texture,
+				(Rectangle){
+					frameWidthBug * mosquitoes[i].frame,
+					0,
+					(mosquitoes[i].direction == RIGHT) ? -frameWidthBug : frameWidthBug,
+					mosquitoes[i].texture.height},
+				mosquitoPosition,
+				RAYWHITE);							
+		}
 		// draw platforms		
 		// DrawCircle(250, 500, 300.0, RED);
 		// DrawLine(250, 500, 950, 500, RED);
