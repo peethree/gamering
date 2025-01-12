@@ -5,7 +5,8 @@
 
 // TODO: 
 // platforms to move on
-// sliding level, upward? 
+// vertical progress
+// block off the side of the screen 
 // big tongue shooting out at bugs?
 // scoreboard
 
@@ -56,10 +57,7 @@ typedef struct Bug{
 	float spiralSpeed;
 	float convergence;
 	// minimum distance from player
-	float minRadius; 	
-
-
-	// load progressively more bugs from off screen moving toward / circling around the frog getting ever nearer
+	float minRadius; 		
 	// collision with frog tongue = KILL
 } Bug;
 
@@ -160,12 +158,12 @@ void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {
 	mosquito->targetPosition.y = froggy->position.y + mosquito_y;
 
 	// modify how fast the mosquito wants to reach the froggy
-    mosquito->desiredVelocity.x = (mosquito->targetPosition.x - mosquito->position.x) * 3.5f,
-	mosquito->desiredVelocity.y = (mosquito->targetPosition.y - mosquito->position.y) * 3.5f;
+    mosquito->desiredVelocity.x = (mosquito->targetPosition.x - mosquito->position.x) * 4.6f,
+	mosquito->desiredVelocity.y = (mosquito->targetPosition.y - mosquito->position.y) * 4.6f;
 
 	// gradually increase velocity
-	mosquito->velocity.x += (mosquito->desiredVelocity.x - mosquito->velocity.x) * 0.1f;
-    mosquito->velocity.y += (mosquito->desiredVelocity.y - mosquito->velocity.y) * 0.1f;
+	mosquito->velocity.x += (mosquito->desiredVelocity.x - mosquito->velocity.x) * 0.2f;
+    mosquito->velocity.y += (mosquito->desiredVelocity.y - mosquito->velocity.y) * 0.2f;
 
 	// apply velocity with delay modifier from previous block
 	mosquito->position.x += mosquito->velocity.x * deltaTime;
@@ -305,11 +303,11 @@ int main () {
 		apply_velocity(&froggy, deltaTime);		
 
 		for (int i = 0; i < activeBugs; i++) {
-			move_bug(&mosquitoes[i], &froggy, GetFrameTime());
+			move_bug(&mosquitoes[i], &froggy, deltaTime);
 			collision_check(&froggy, &mosquitoes[i]);	
 		}			
 
-		// if below ground, put back on ground
+		// if froggy below ground, put it back on ground
     	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
 			froggy.position.y = GetScreenHeight() - froggy.position.height;
 		}
