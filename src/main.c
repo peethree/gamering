@@ -48,13 +48,16 @@ typedef struct Bug{
 	Rectangle hitbox;
 	int frame;
 	// bug movement
+	Vector2 targetPosition;
+	Vector2 desiredVelocity;
 	Rectangle previousPosition;
 	float angle;
 	float radius;
 	float spiralSpeed;
 	float convergence;
 	// minimum distance from player
-	float minRadius; 
+	float minRadius; 	
+
 
 	// load progressively more bugs from off screen moving toward / circling around the frog getting ever nearer
 	// collision with frog tongue = KILL
@@ -135,6 +138,9 @@ void move_frog(Frog *froggy, int maxFrames) {
 
 // movement bug
 void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {	
+	// previous position for frame flipping
+	mosquito->previousPosition.x = mosquito->position.x;
+
 	// update angle
 	mosquito->angle += mosquito->spiralSpeed * deltaTime;
 
@@ -147,16 +153,23 @@ void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {
 
 	// convert radius, angle -> x, y
 	float mosquito_x = mosquito->radius * cosf(mosquito->angle); 
-	float mosquito_y = mosquito->radius * sinf(mosquito->angle);
-	
+	float mosquito_y = mosquito->radius * sinf(mosquito->angle);	
 
-	// keep track of previous position
-	mosquito->previousPosition = mosquito->position;
+	// set the target position to chase
+	mosquito->targetPosition.x = froggy->position.x + mosquito_x; 
+	mosquito->targetPosition.y = froggy->position.y + mosquito_y;
 
-	// update position 	
-	mosquito->position.x = froggy->position.x + mosquito_x;
-	mosquito->position.y = froggy->position.y + mosquito_y;	
+	// modify how fast the mosquito wants to reach the froggy
+    mosquito->desiredVelocity.x = (mosquito->targetPosition.x - mosquito->position.x) * 3.5f,
+	mosquito->desiredVelocity.y = (mosquito->targetPosition.y - mosquito->position.y) * 3.5f;
 
+	// gradually increase velocity
+	mosquito->velocity.x += (mosquito->desiredVelocity.x - mosquito->velocity.x) * 0.1f;
+    mosquito->velocity.y += (mosquito->desiredVelocity.y - mosquito->velocity.y) * 0.1f;
+
+	// apply velocity with delay modifier from previous block
+	mosquito->position.x += mosquito->velocity.x * deltaTime;
+	mosquito->position.y += mosquito->velocity.y * deltaTime;	
 	
 	// if horizontal movement is +x flip frame right, if -x flip frame pointing left
 	float dif = mosquito->position.x - mosquito->previousPosition.x;
@@ -213,7 +226,7 @@ void collision_check(Frog *froggy, Bug *mosquito) {
 void spawn_bug(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {	
 	// initialize bug(s)
     mosquito->texture = mosquito_texture;
-    mosquito->position = (Rectangle){froggy->position.x, froggy->position.y - 200.0f, 0.0f, 36.0f};
+    mosquito->position = (Rectangle){froggy->position.x + (float)GetRandomValue(-250, 250), froggy->position.y + (float)GetRandomValue(200, 300), 0.0f, 36.0f};
     mosquito->direction = LEFT;
     mosquito->frame = 0;
     mosquito->angle = 0.0f;
@@ -316,8 +329,7 @@ int main () {
 			DrawText("FROGGY HAS PERISHED", 400, 400, 42, RED);
 		}
 		// debugging: visual hitboxes
-		// DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 
-		// DrawRectangleLinesEx(mosquito.hitbox, 1, RED);   		
+		// DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 		  		
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
 		ClearBackground(BLACK);
@@ -343,7 +355,7 @@ int main () {
 			 
 		// draw the bugs
 		for (int i = 0; i < activeBugs; i++) {
-			
+
 			Vector2 mosquitoPosition = { 
 				(float)mosquitoes[i].position.x, 
 				(float)mosquitoes[i].position.y
@@ -374,7 +386,9 @@ int main () {
 					mosquitoes[i].texture.height * (float)(GetRandomValue(9, 10) / 10.0)},
 				(Vector2){0,0},
 				0.0f,
-				RAYWHITE);						
+				RAYWHITE);	
+
+			// DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 					
 		}
 
 		// draw platforms		
