@@ -3,12 +3,23 @@
 
 #include "resource_dir.h"	
 
+#define MAX_BUGS 100
+#define MAX_LILLYPADS 1000
+#define FROGGY_HEALTH 10000.0
+#define BUG_SPAWN_INTERVAL 0.5f
+#define FROGGY_VELOCITY_X 200.0
+#define FROGGY_JUMP_VELOCITY_Y 1100.0
+#define FROGGY_JUMP_VELOCITY_X 380.0
+#define FROGGY_FALL_VELOCITY 450.0
+#define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
+
+
 // TODO: 
 // find a better way to deal with level building
-
+// don't allow mid air jump
 // big tongue shooting out at bugs?
+// multiplayer?
 
-// used to flip pictures
 typedef enum Direction {
 	LEFT = -1,
 	RIGHT = 1,
@@ -27,18 +38,14 @@ typedef struct Frog{
 	Direction direction;
 	Rectangle hitbox;
 	float health;
-	Status alive;
-	//jump related variables	
-	bool isJumping; 		
+	Status alive;	
+	bool isJumping; 
+	bool isBouncing;		
 	int frame;
 	float jumpTimer; 
 	float frameTimer; 
 	float highestPosition;
 } Frog;
-
-// max mosquitos
-#define MAX_BUGS 100
-#define MAX_LILLYPADS 1000
 
 // struct for killer bugs
 typedef struct Bug{
@@ -48,17 +55,16 @@ typedef struct Bug{
 	Direction direction;
 	Rectangle hitbox;
 	int frame;
-	// bug movement
+	Status alive;	
 	Vector2 targetPosition;
 	Vector2 desiredVelocity;
 	Rectangle previousPosition;
 	float angle;
 	float radius;
 	float spiralSpeed;
-	float convergence;
-	// minimum distance from player
-	float minRadius; 		
-	// collision with frog tongue = KILL
+	float convergence;	
+	float minRadius; 	
+	bool isActive;	
 } Bug;
 
 // platforms to jump on for the frog
@@ -74,8 +80,8 @@ typedef struct Lilypad{
 void apply_gravity(Frog *froggy) {
 	froggy->velocity.y += 36.0;
 
-	if (froggy->velocity.y > 450.0) {
-		froggy->velocity.y = 450.0;
+	if (froggy->velocity.y > FROGGY_FALL_VELOCITY) {
+		froggy->velocity.y = FROGGY_FALL_VELOCITY;
 	}
 }
 
@@ -92,24 +98,24 @@ void move_frog(Frog *froggy, int maxFrames) {
 		if (IsKeyDown(KEY_D)) {
 			if (froggy->isJumping) {
 				// faster side movement in mid-air
-				froggy->velocity.x = 380.0;			
+				froggy->velocity.x = FROGGY_JUMP_VELOCITY_X;			
 			} else {
-				froggy->velocity.x = 200.0;			
+				froggy->velocity.x = FROGGY_JUMP_VELOCITY_X;			
 			}				
 			froggy->direction = RIGHT;
 		}
 		if (IsKeyDown(KEY_A)) {
 			if (froggy->isJumping) {
-				froggy->velocity.x = -380.0;
+				froggy->velocity.x = -FROGGY_JUMP_VELOCITY_X;
 			} else {
-				froggy->velocity.x = -200.0;
+				froggy->velocity.x = -FROGGY_JUMP_VELOCITY_X;
 			}				
 			froggy->direction = LEFT;
 		}
 
 		// jump (prevent double jumps)
 		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
-			froggy->velocity.y = -1100.0;		
+			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;			
 
@@ -143,48 +149,62 @@ void move_frog(Frog *froggy, int maxFrames) {
 	}
 }	
 
+void kill_bug(Bug *mosquito) {
+	if (mosquito->alive = DEAD) {
+		// do something
+	}	
+}
+
 // movement bug
 void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {	
-	// previous position for frame flipping
-	mosquito->previousPosition.x = mosquito->position.x;
 
-	// update angle
-	mosquito->angle += mosquito->spiralSpeed * deltaTime;
+	if (mosquito->alive == ALIVE) {
+		// previous position for frame flipping
+		mosquito->previousPosition.x = mosquito->position.x;
 
-	// decrease radius
-	if (mosquito->radius > mosquito->minRadius) {
-		mosquito->radius -= mosquito->convergence * deltaTime;
-		// increase the convergence over time
-		mosquito->convergence += 0.1;
+		// update angle
+		mosquito->angle += mosquito->spiralSpeed * deltaTime;
+
+		// decrease radius
+		if (mosquito->radius > mosquito->minRadius) {
+			mosquito->radius -= mosquito->convergence * deltaTime;
+			// increase the convergence over time
+			mosquito->convergence += 0.1;
+		}
+
+		// convert radius, angle -> x, y
+		float mosquito_x = mosquito->radius * cosf(mosquito->angle); 
+		float mosquito_y = mosquito->radius * sinf(mosquito->angle);	
+
+		// set the target position to chase
+		mosquito->targetPosition.x = froggy->position.x + mosquito_x; 
+		mosquito->targetPosition.y = froggy->position.y + mosquito_y;
+
+		// modify how fast the mosquito wants to reach the froggy
+		mosquito->desiredVelocity.x = (mosquito->targetPosition.x - mosquito->position.x) * 4.6f,
+		mosquito->desiredVelocity.y = (mosquito->targetPosition.y - mosquito->position.y) * 4.6f;
+
+		// gradually increase velocity
+		mosquito->velocity.x += (mosquito->desiredVelocity.x - mosquito->velocity.x) * 0.2f;
+		mosquito->velocity.y += (mosquito->desiredVelocity.y - mosquito->velocity.y) * 0.2f;
+
+		// apply velocity with delay modifier from previous block
+		mosquito->position.x += mosquito->velocity.x * deltaTime;
+		mosquito->position.y += mosquito->velocity.y * deltaTime;	
+		
+		// if horizontal movement is +x flip frame right, if -x flip frame pointing left
+		float dif = mosquito->position.x - mosquito->previousPosition.x;
+
+		if (dif > 0.0) {
+			mosquito->frame = 1;
+		} else {
+			mosquito->frame = 0;
+		}
 	}
-
-	// convert radius, angle -> x, y
-	float mosquito_x = mosquito->radius * cosf(mosquito->angle); 
-	float mosquito_y = mosquito->radius * sinf(mosquito->angle);	
-
-	// set the target position to chase
-	mosquito->targetPosition.x = froggy->position.x + mosquito_x; 
-	mosquito->targetPosition.y = froggy->position.y + mosquito_y;
-
-	// modify how fast the mosquito wants to reach the froggy
-    mosquito->desiredVelocity.x = (mosquito->targetPosition.x - mosquito->position.x) * 4.6f,
-	mosquito->desiredVelocity.y = (mosquito->targetPosition.y - mosquito->position.y) * 4.6f;
-
-	// gradually increase velocity
-	mosquito->velocity.x += (mosquito->desiredVelocity.x - mosquito->velocity.x) * 0.2f;
-    mosquito->velocity.y += (mosquito->desiredVelocity.y - mosquito->velocity.y) * 0.2f;
-
-	// apply velocity with delay modifier from previous block
-	mosquito->position.x += mosquito->velocity.x * deltaTime;
-	mosquito->position.y += mosquito->velocity.y * deltaTime;	
-	
-	// if horizontal movement is +x flip frame right, if -x flip frame pointing left
-	float dif = mosquito->position.x - mosquito->previousPosition.x;
-
-	if (dif > 0.0) {
-		mosquito->frame = 1;
-	} else {
-		mosquito->frame = 0;
+	// bug should fall down off the screen
+	if (mosquito->alive == DEAD) {
+		mosquito->velocity.y = 300.0;
+		mosquito->position.y += mosquito->velocity.y * GetFrameTime();
 	}
 }
 
@@ -213,9 +233,16 @@ void collision_check_bugs(Frog *froggy, Bug *mosquito) {
 
 	// froggy mosquito collision
 	if (CheckCollisionRecs(froggy->hitbox, mosquito->hitbox)) {
-		if (froggy->health >= 0.0) {
-		froggy->health -= 1.8;	
-		}
+		// if the y value of the frog is bigger than the mosquito, deduce health
+		if (froggy->position.y > mosquito->position.y) {		
+			if (froggy->health >= 0.0) {
+			froggy->health -= 1.8;	
+			}	
+		// otherwise allow the frog to bounce off mosquito for a boost and kill the bug	
+		} else {			
+			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
+			mosquito->alive = DEAD;
+		}						
 
 		// frog dies when health goes to 0 . . . .
 		if (froggy->health <= 0) {
@@ -236,7 +263,7 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 		.height = 35.0f
 	};
 
-	// lilypad hitbox
+	// lilypad hitbox(es)
 	if (pad->frame == 0) {
 		pad->hitbox = (Rectangle){
 			.x = pad->position.x + 5.0f,
@@ -277,8 +304,7 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 	// allow the frog to jump through the lilypads, but catch it when it falls
 	if (froggy->position.y > pad->position.y && pad->isActive) {
 		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {	
-			// smoother transition		
-			
+			// smoother transition						
 			froggy->position.y += (pad->position.y - froggy->position.y) * 0.9f;	
 			
 			// froggy is not moving up or down vertically (affected by gravity --> velocity.y 450.0)
@@ -305,6 +331,8 @@ void spawn_bug(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {
     mosquito->spiralSpeed = (float)GetRandomValue(-3,3);
     mosquito->convergence = (float)GetRandomValue(12,18);
     mosquito->minRadius = 3.0f;	
+	mosquito->alive = ALIVE;
+	mosquito->isActive = true;
 }
 
 void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {	
@@ -316,7 +344,6 @@ void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
 		.width = 0.0,
 		.height = 36.0,
 	};
-	// TODO: the third frame's hitbox is fucked up, omit for now
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;	
 }
@@ -328,25 +355,25 @@ void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *frog
 		.y = froggy->position.y + GetRandomValue(-800, -1000),
 		.width = 0.0,
 		.height = 36.0,
-	};
-	// TODO: the third frame's hitbox is fucked up, omit for now
+	};	
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;
 }
 
-// set to inactive
+// set lilypad to inactive
 void deactivate_lilypad(Lilypad *pad) {
     pad->isActive = false;
     pad->hitbox = (Rectangle){0, 0, 0, 0};
 }
 
-// remove lilypads when froggy has climbed certain amount
+
 void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
 	// get the highest y value visited
 	if (froggy->position.y < froggy->highestPosition) {
         froggy->highestPosition = froggy->position.y;
     }
 
+	// remove lilypads when froggy has climbed certain distance
     if (pad->isActive && pad->position.y > froggy->highestPosition + 1500.0f) {
         deactivate_lilypad(pad);
     }
@@ -378,11 +405,11 @@ int main () {
 		.isJumping = false,
 		.frame = 0,
 		.jumpTimer = 0.0f,   
-		.frameTimer = 0.0f,
-		// TODO: make this reasonable
-		.health = 100000.0,
+		.frameTimer = 0.0f,		
+		.health = FROGGY_HEALTH,
 		.alive = ALIVE,
-		.highestPosition = 0.0f	
+		.highestPosition = 0.0f,
+		.isBouncing = false
 	};					
 
 	// 8 pictures on the frog sprite sheet -> 
@@ -406,8 +433,7 @@ int main () {
 	int activeBugs = 0;
 
 	// bug spawntimer
-	float bugSpawnTimer = 0.0f;	
-	const float bugSpawnInterval = 100.5f;
+	float bugSpawnTimer = 0.0f;		
 
 	// lilipad init
 	Texture2D lilypad_texture = LoadTexture("lilipads.png");
@@ -431,7 +457,7 @@ int main () {
 		bugSpawnTimer += GetFrameTime();
 
 		// spawn bugs every 0.5f
-		if (bugSpawnTimer >= bugSpawnInterval && activeBugs < MAX_BUGS) {
+		if (bugSpawnTimer >= BUG_SPAWN_INTERVAL && activeBugs < MAX_BUGS) {
 			spawn_bug(&mosquitoes[activeBugs], &froggy, mosquito_texture);
 			activeBugs++;
 			bugSpawnTimer = 0.0f;	
@@ -447,29 +473,46 @@ int main () {
 
 		// keep spawning lilypads, this time offscreen
 		if (froggy.position.y < nextLilypadSpawn) {
-			for (int i = 0; i < 12 && i < MAX_LILLYPADS; i++) {
-				make_lilypads_offscreen(&pads[activePads], lilypad_texture, &froggy);
+			for (int i = 0; i < OFFSCREEN_LILYPAD_SPAWN_AMOUNT && i < MAX_LILLYPADS; i++) {
+				make_lilypads_offscreen(&pads[activeBugs], lilypad_texture, &froggy);
 				activePads++;				  
 			}
 			nextLilypadSpawn -= 400.0f;
 		}	
 				
 		apply_gravity(&froggy);
-		move_frog(&froggy, maxFrames);	
+		move_frog(&froggy, maxFrames);			
 		apply_velocity(&froggy, GetFrameTime());	
 
+
+		int activePadsAfterLoop = 0;
 		// check collision with pads, remove the ones too far below
 		for (int i = 0; i < activePads; i++) {
+
 			// skip inactive pads
 			if (!pads[i].isActive) continue;
-			collision_check_pads(&froggy, &pads[i]);
-			remove_lilypads_below(&pads[i], &froggy); 			
+			collision_check_pads(&froggy, &pads[i]);			
+			remove_lilypads_below(&pads[i], &froggy); 
+
+			// adjust the amount of active pads after without messing up the loop index
+			if (pads[i].isActive) {
+        		pads[activePadsAfterLoop++] = pads[i];
+    		}			
 		}	
+		activePads = activePadsAfterLoop;
 
 		// update bug movement and collision with bugs and frog
 		for (int i = 0; i < activeBugs; i++) {
+
+			if (!mosquitoes[i].isActive) continue;
+			// kill_bug(&mosquitoes[i]);
 			move_bug(&mosquitoes[i], &froggy, GetFrameTime());
-			collision_check_bugs(&froggy, &mosquitoes[i]);	
+			collision_check_bugs(&froggy, &mosquitoes[i]);
+
+			// update activeBugs when one is killed
+			// if (mosquitoes[i].alive == DEAD) {
+			// 	activeBugs--;
+			// }			
 		}			
 
 		// if froggy below ground, put it back on ground
@@ -518,7 +561,7 @@ int main () {
 				(Rectangle){
 					frameWidthLilypad * pads[i].frame,
 					0,
-					frameWidthBug,
+					frameWidthLilypad,
 					pads[i].texture.height	
 				},
 				lilypadPosition,
@@ -557,17 +600,7 @@ int main () {
 			Vector2 mosquitoPosition = { 
 				(float)mosquitoes[i].position.x, 
 				(float)mosquitoes[i].position.y
-			};						
-
-			// DrawTextureRec(
-			// 	mosquitoes[i].texture,
-			// 	(Rectangle){
-			// 		frameWidthBug * mosquitoes[i].frame,
-			// 		0,
-			// 		(mosquitoes[i].direction == RIGHT) ? -frameWidthBug : frameWidthBug,
-			// 		mosquitoes[i].texture.height},
-			// 	mosquitoPosition,
-			// 	RAYWHITE);				
+			};									
 
 			// annoying twitching animation by scaling it from 90 / 100% size every frame :thumbs_up:
 			DrawTexturePro(
@@ -581,7 +614,8 @@ int main () {
 					mosquitoPosition.x,
 					mosquitoPosition.y,
 					frameWidthBug * (float)(GetRandomValue(9, 10) / 10.0),
-					mosquitoes[i].texture.height * (float)(GetRandomValue(9, 10) / 10.0)},
+					// TODO: get this to work -- flip the mosquito when it dies
+					(float)mosquitoes[i].texture.height * (float)mosquitoes[i].alive * (float)(GetRandomValue(9, 10) / 10.0)},
 				(Vector2){0,0},
 				0.0f,
 				RAYWHITE);	
