@@ -4,11 +4,7 @@
 #include "resource_dir.h"	
 
 // TODO: 
-// platforms to move on
-// vertical progress
-
-// camera movement
-// make the score / health etc dynamic (based upon frog location)
+// find a better way to deal with level building
 
 // big tongue shooting out at bugs?
 
@@ -37,13 +33,12 @@ typedef struct Frog{
 	int frame;
 	float jumpTimer; 
 	float frameTimer; 
+	float highestPosition;
 } Frog;
 
 // max mosquitos
 #define MAX_BUGS 100
 #define MAX_LILLYPADS 1000
-#define SCREEN_WIDTH 1280
-#define SCREEN_HEIGHT 800
 
 // struct for killer bugs
 typedef struct Bug{
@@ -72,6 +67,7 @@ typedef struct Lilypad{
 	Rectangle position;
 	Rectangle hitbox;
 	int frame;
+	bool isActive;
 } Lilypad;
 
 // gravity frog
@@ -198,9 +194,7 @@ void apply_velocity(Frog *froggy, float deltaTime) {
 	froggy->position.y += froggy->velocity.y * deltaTime;
 }	
 
-// collision
-void collision_check(Frog *froggy, Bug *mosquito, Lilypad *pad) {
-	
+void collision_check_bugs(Frog *froggy, Bug *mosquito) {
 	// frog hitbox
 	froggy->hitbox = (Rectangle){
 		.x = froggy->position.x + 10.0f,
@@ -215,6 +209,31 @@ void collision_check(Frog *froggy, Bug *mosquito, Lilypad *pad) {
 		.y = mosquito->position.y + 1.0f,
 		.width = 50.0f,
 		.height = 50.0f
+	};
+
+	// froggy mosquito collision
+	if (CheckCollisionRecs(froggy->hitbox, mosquito->hitbox)) {
+		if (froggy->health >= 0.0) {
+		froggy->health -= 1.8;	
+		}
+
+		// frog dies when health goes to 0 . . . .
+		if (froggy->health <= 0) {
+			froggy->health = 0;
+			froggy->alive = DEAD;	
+			froggy->frame = 5;		
+		}
+	}
+}
+
+// collision
+void collision_check_pads(Frog *froggy, Lilypad *pad) {	
+	// frog hitbox
+	froggy->hitbox = (Rectangle){
+		.x = froggy->position.x + 10.0f,
+		.y = froggy->position.y + 1.0f,
+		.width = 35.0f,
+		.height = 35.0f
 	};
 
 	// lilypad hitbox
@@ -245,34 +264,28 @@ void collision_check(Frog *froggy, Bug *mosquito, Lilypad *pad) {
 		};
 	} 
 
-	// if (pad->frame == 3) {
-	// 	pad->hitbox = (Rectangle){
-	// 		.x = pad->position.x + 0.0f,
-	// 		.y = pad->position.y + 45.0f,
-	// 		.width = 50.0f,
-	// 		.height = 1.0f
-	// 	};
-	// }
+	if (pad->frame == 3) {
+		pad->hitbox = (Rectangle){
+			.x = pad->position.x + 0.0f,
+			.y = pad->position.y + 40.0f,
+			.width = 50.0f,
+			.height = 1.0f
+		};
+	}
 
 	// frog lilypad collision
 	// allow the frog to jump through the lilypads, but catch it when it falls
-	if (froggy->position.y > pad->position.y) {
-		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {			
-			froggy->position.y = pad->position.y;			
-		}
-	}
-
-	// froggy mosquito collision
-	if (CheckCollisionRecs(froggy->hitbox, mosquito->hitbox)) {
-		if (froggy->health >= 0.0) {
-		froggy->health -= 1.8;	
-		}
-
-		// frog dies when health goes to 0 . . . .
-		if (froggy->health <= 0) {
-			froggy->health = 0;
-			froggy->alive = DEAD;	
-			froggy->frame = 5;		
+	if (froggy->position.y > pad->position.y && pad->isActive) {
+		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {	
+			// smoother transition		
+			
+			froggy->position.y += (pad->position.y - froggy->position.y) * 0.9f;	
+			
+			// froggy is not moving up or down vertically (affected by gravity --> velocity.y 450.0)
+			if (froggy->velocity.y == 450.0) {
+				froggy->frame = 1;
+				froggy->isJumping = false;	
+			}
 		}
 	}
 }
@@ -294,24 +307,49 @@ void spawn_bug(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {
     mosquito->minRadius = 3.0f;	
 }
 
-void move_camera(Frog *froggy) {
-	if (froggy->position.y >= 400) {
-		// move camera
-	}
-
-}
-
-void make_lilypad(Lilypad *pad, Texture2D lilypad_texture) {	
+void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {	
 	// initialize the platforms	
 	pad->texture = lilypad_texture;
 	pad->position = (Rectangle){
-		.x = GetRandomValue(100, 700),
-		.y = GetRandomValue(-1000, 650),
+		.x = froggy->position.x + GetRandomValue(-800, 600),
+		.y = froggy->position.y + GetRandomValue(-1600, 300),
 		.width = 0.0,
 		.height = 36.0,
 	};
 	// TODO: the third frame's hitbox is fucked up, omit for now
-	pad->frame = GetRandomValue(0,2);
+	pad->frame = GetRandomValue(0,3);
+	pad->isActive = true;	
+}
+
+void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
+	pad->texture = lilypad_texture;
+	pad->position = (Rectangle){
+		.x = froggy->position.x + GetRandomValue(-600, 600),
+		.y = froggy->position.y + GetRandomValue(-800, -1000),
+		.width = 0.0,
+		.height = 36.0,
+	};
+	// TODO: the third frame's hitbox is fucked up, omit for now
+	pad->frame = GetRandomValue(0,3);
+	pad->isActive = true;
+}
+
+// set to inactive
+void deactivate_lilypad(Lilypad *pad) {
+    pad->isActive = false;
+    pad->hitbox = (Rectangle){0, 0, 0, 0};
+}
+
+// remove lilypads when froggy has climbed certain amount
+void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
+	// get the highest y value visited
+	if (froggy->position.y < froggy->highestPosition) {
+        froggy->highestPosition = froggy->position.y;
+    }
+
+    if (pad->isActive && pad->position.y > froggy->highestPosition + 1500.0f) {
+        deactivate_lilypad(pad);
+    }
 }
 
 int main () {	
@@ -341,17 +379,20 @@ int main () {
 		.frame = 0,
 		.jumpTimer = 0.0f,   
 		.frameTimer = 0.0f,
-		.health = 100.0,
-		.alive = ALIVE
+		// TODO: make this reasonable
+		.health = 100000.0,
+		.alive = ALIVE,
+		.highestPosition = 0.0f	
 	};					
 
 	// 8 pictures on the frog sprite sheet -> 
 	const float frameWidth = (float)(frog_texture.width / 8);
 	const int maxFrames = (int)frog_texture.width / (int)frameWidth;
 
+	// initialize camera 
 	Camera2D camera = {0};
-	camera.target = (Vector2){froggy.position.x + froggy.position.width / 2, froggy.position.y};
-	camera.offset = (Vector2){SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f};
+	camera.target = (Vector2){0, froggy.position.y};  
+	camera.offset = (Vector2){0, GetScreenHeight() / 2.0f};  
 	camera.rotation = 0.0f;
 	camera.zoom = 1.0f;
 
@@ -366,9 +407,8 @@ int main () {
 
 	// bug spawntimer
 	float bugSpawnTimer = 0.0f;	
-	const float bugSpawnInterval = 0.5f;
+	const float bugSpawnInterval = 100.5f;
 
-	// TODO: lilipad level generator
 	// lilipad init
 	Texture2D lilypad_texture = LoadTexture("lilipads.png");
 
@@ -377,86 +417,96 @@ int main () {
 	int activePads = 0;
 	
 	// 4 frames in lilypad sprite sheet
-	const float frameWidthLilypad = (float)(lilypad_texture.width / 4);
+	const float frameWidthLilypad = (float)(lilypad_texture.width / 4);	
 	
-	int height_counter = 0;
-	
+	float nextLilypadSpawn = 0.0f;
+
+	// highest y value frog has visited so far
+	// float highestFrogPosition = 0.0f;
+
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
-		float deltaTime = GetFrameTime();
-		
-   		bugSpawnTimer += deltaTime;
+		// update
+		bugSpawnTimer += GetFrameTime();
 
 		// spawn bugs every 0.5f
 		if (bugSpawnTimer >= bugSpawnInterval && activeBugs < MAX_BUGS) {
 			spawn_bug(&mosquitoes[activeBugs], &froggy, mosquito_texture);
 			activeBugs++;
-
-			make_lilypad(&pads[activePads], lilypad_texture);
-			activePads++;
-
 			bugSpawnTimer = 0.0f;	
-
-
-
+		}
+	
+		// make initial pads to jump on		
+		if (activePads < 40) {
+			for (int i = 0; i < 40; i++) {
+				make_lilypads(&pads[activePads], lilypad_texture, &froggy);
+				activePads++;
+			}
 		}
 
-		// logic needed: every x amount of y-axis climbing, make more lilypads
-	
-		// update 		
+		// keep spawning lilypads, this time offscreen
+		if (froggy.position.y < nextLilypadSpawn) {
+			for (int i = 0; i < 12 && i < MAX_LILLYPADS; i++) {
+				make_lilypads_offscreen(&pads[activePads], lilypad_texture, &froggy);
+				activePads++;				  
+			}
+			nextLilypadSpawn -= 400.0f;
+		}	
+				
 		apply_gravity(&froggy);
 		move_frog(&froggy, maxFrames);	
-		apply_velocity(&froggy, deltaTime);		
+		apply_velocity(&froggy, GetFrameTime());	
 
+		// check collision with pads, remove the ones too far below
+		for (int i = 0; i < activePads; i++) {
+			// skip inactive pads
+			if (!pads[i].isActive) continue;
+			collision_check_pads(&froggy, &pads[i]);
+			remove_lilypads_below(&pads[i], &froggy); 			
+		}	
+
+		// update bug movement and collision with bugs and frog
 		for (int i = 0; i < activeBugs; i++) {
-			move_bug(&mosquitoes[i], &froggy, deltaTime);
-			collision_check(&froggy, &mosquitoes[i], &pads[i]);	
+			move_bug(&mosquitoes[i], &froggy, GetFrameTime());
+			collision_check_bugs(&froggy, &mosquitoes[i]);	
 		}			
 
 		// if froggy below ground, put it back on ground
     	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
 			froggy.position.y = GetScreenHeight() - froggy.position.height;
 		}
-
-	
-
 	
 		// drawing
 		BeginDrawing();
 
-		BeginMode2D(camera);
-
-		// camera.target.x = froggy.position.x + froggy.position.width / 2;
-
-		// 
-		if (froggy.position.y < camera.target.y - SCREEN_HEIGHT / 2) {
-			camera.target.y = froggy.position.y + SCREEN_HEIGHT / 2;
-		}
-
+		BeginMode2D(camera);		
 		
-		if (camera.target.y > SCREEN_HEIGHT) {
-			camera.target.y = SCREEN_HEIGHT;
+		// follow the froggy's y position
+		camera.target.y = froggy.position.y;				
+		
+		// * smoothening factor
+		camera.target.y = camera.target.y + (froggy.position.y - camera.target.y) * 0.1f;
+
+		// prevent camera from going below ground:
+		float minY = GetScreenHeight()/2.0f;
+		if (camera.target.y > minY) {
+			camera.target.y = minY;
 		}
-
-
 
 		// debug 
 		// DrawText(TextFormat("Frame: %d", froggy.frame), 10, 10, 20, WHITE);
 		// DrawText(TextFormat("Is Jumping: %s", froggy.isJumping ? "true" : "false"), 10, 40, 20, WHITE);
 		// DrawText(TextFormat("Frame Timer: %.2f", froggy.frameTimer), 10, 70, 20, WHITE);
 		// DrawText(TextFormat("Jump Timer: %.2f", froggy.jumpTimer), 10, 100, 20, WHITE);
-		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, WHITE);
 		// DrawText(TextFormat("Status: %d", froggy.alive), 10, 160, 20, WHITE);
 
-		if (froggy.alive == DEAD) {
-			DrawText("FROGGY HAS PERISHED", 400, 400, 42, RED);
-		}
+
 		// debugging: visual hitboxes
 		// DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 	
 			
-		for (int i = 0; i < activePads; i++) {
-			// lilypad position helper function
+		for (int i = 0; i < activePads; i++) {		
+			if (!pads[i].isActive) continue;
 			Vector2 lilypadPosition = {
 				(float)pads[i].position.x,
 				(float)pads[i].position.y
@@ -539,7 +589,21 @@ int main () {
 			DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 					
 		}
 
-		// EndMode2D();
+		EndMode2D();
+
+		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, WHITE);
+		DrawText(TextFormat("Position: %.2f", froggy.position.y), 10, 10, 20, WHITE);
+		DrawText(TextFormat("Velocity: %.2f", froggy.velocity.y), 10, 40, 20, WHITE);
+		DrawText(TextFormat("lilypads: %d", activePads), 10, 70, 20, WHITE);
+		DrawText(TextFormat("bugs: %d", activeBugs), 10, 100, 20, WHITE);
+		DrawText(TextFormat("next_spawn: %.2f", nextLilypadSpawn), 10, 130, 20, WHITE);
+		
+		// DrawText(TextFormat("current_height: %.2f", currentHeight), 10, 70, 20, WHITE);
+
+
+		if (froggy.alive == DEAD) {
+			DrawText("FROGGY HAS PERISHED", 400, 400, 42, RED);
+		}
 
 		// end the frame and get ready for the next one (display frame, poll input, etc...)
 		EndDrawing();		
