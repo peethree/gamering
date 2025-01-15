@@ -5,21 +5,28 @@
 
 #define MAX_BUGS 100
 #define MAX_LILLYPADS 1000
-#define FROGGY_HEALTH 10000.0
-#define BUG_SPAWN_INTERVAL 5.5f
+#define FROGGY_HEALTH 1000.0
+#define BUG_SPAWN_INTERVAL 0.5f
 #define FROGGY_VELOCITY_X 200.0
 #define FROGGY_JUMP_VELOCITY_Y 1100.0
 #define FROGGY_JUMP_VELOCITY_X 380.0
 #define FROGGY_FALL_VELOCITY 450.0
 #define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
 
+#define MAX_TONGUE_LENGTH 350.0f
+#define ATTACK_DURATION 0.4f
+#define TONGUE_GROWTH_SPEED 800.0f
+#define TONGUE_WIDTH 5.0f
 
 // TODO: 
 // add more bug movement patterns
+// add proximity based bug buzzing
 // find a better way to deal with level building
 // don't allow mid air jump
-// big tongue shooting out at bugs?
 // multiplayer?
+
+// cool backgrounds, stages that change depending on y value
+// stage 1: pond, stage 5: space, astronaut frog ???
 
 typedef enum Direction {
 	LEFT = -1,
@@ -38,6 +45,11 @@ typedef struct Frog{
 	Vector2 velocity;
 	Direction direction;
 	Rectangle hitbox;
+	Rectangle tongue;
+	Rectangle tongueHitbox;
+	bool isAttacking;
+    float tongueTimer;
+    float attackDuration;
 	float health;
 	Status alive;	
 	bool isJumping; 
@@ -46,6 +58,7 @@ typedef struct Frog{
 	float jumpTimer; 
 	float frameTimer; 
 	float highestPosition;
+	int score;
 } Frog;
 
 // struct for killer bugs
@@ -105,6 +118,7 @@ void move_frog(Frog *froggy, int maxFrames) {
 			}				
 			froggy->direction = RIGHT;
 		}
+
 		if (IsKeyDown(KEY_A)) {
 			if (froggy->isJumping) {
 				froggy->velocity.x = -FROGGY_JUMP_VELOCITY_X;
@@ -150,11 +164,67 @@ void move_frog(Frog *froggy, int maxFrames) {
 	}
 }	
 
-// void kill_bug(Bug *mosquito) {
-// 	if (mosquito->alive = DEAD) {
-// 		// do something
-// 	}	
-// }
+void frog_attack(Frog *froggy) {
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking) {
+        froggy->isAttacking = true;
+        froggy->tongueTimer = 0.0f;
+        froggy->attackDuration = ATTACK_DURATION;
+    }
+
+    // attack animation
+    if (froggy->isAttacking) {
+        froggy->tongueTimer += GetFrameTime();
+        float progress;
+
+        // tongue extends
+        if (froggy->tongueTimer <= froggy->attackDuration / 2) {
+            progress = froggy->tongueTimer / (froggy->attackDuration / 2);
+        }
+        // tongue retracts
+        else {
+            progress = 1.0f - ((froggy->tongueTimer - froggy->attackDuration / 2) / (froggy->attackDuration / 2));
+        }
+
+        // tongue length calculation
+        float currentLength = MAX_TONGUE_LENGTH * progress;
+
+        // tongue position is based on froggy direction
+		// facing right
+        if (froggy->direction == RIGHT) {
+            froggy->tongue = (Rectangle){
+                froggy->position.x + 45.0f,  
+                froggy->position.y + 10.0f,  
+                currentLength,
+                TONGUE_WIDTH
+            };
+		// facing left
+        } else {
+            froggy->tongue = (Rectangle){
+                froggy->position.x - currentLength + 15.0f,  
+                froggy->position.y + 10.0f,
+                currentLength,
+                TONGUE_WIDTH
+            };
+        }
+
+        froggy->tongueHitbox = froggy->tongue;
+
+        // reset hitbox when attack is over
+        if (froggy->tongueTimer >= froggy->attackDuration) {
+            froggy->isAttacking = false;
+            froggy->tongue = (Rectangle){0, 0, 0, 0};
+            froggy->tongueHitbox = (Rectangle){0, 0, 0, 0};
+        }
+    }
+}
+
+void draw_tongue(Frog *froggy) {
+	if (froggy->isAttacking) {
+        DrawRectangleRec(froggy->tongue, RED); 
+		// DrawRectangleRec(froggy->tongueHitbox, WHITE);
+	}
+}
 
 // movement bug
 void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {	
@@ -202,6 +272,7 @@ void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {
 			mosquito->frame = 0;
 		}
 	}
+
 	// bug should fall down off the screen
 	if (mosquito->alive == DEAD) {
 		mosquito->velocity.y = 300.0;
@@ -218,7 +289,7 @@ void apply_velocity(Frog *froggy, float deltaTime) {
 void deactivate_bug(Bug *mosquito, Frog *froggy) {	
 	if (mosquito->alive == DEAD) {
 		// deactivate bug at y distance difference			
-		if (mosquito->isActive && (mosquito->position.y > froggy->highestPosition + 800.0f)) {
+		if (mosquito->isActive && (mosquito->position.y > froggy->highestPosition + 1000.0f)) {
 			mosquito->isActive = false;
 		}
 	}
@@ -241,6 +312,14 @@ void collision_check_bugs(Frog *froggy, Bug *mosquito) {
 		.height = 50.0f
 	};
 
+	// when the tongue hits a bug, kill it, increment score
+	if (mosquito->alive == ALIVE) {
+		if (CheckCollisionRecs(froggy->tongueHitbox, mosquito->hitbox)) {
+			mosquito->alive = DEAD;
+			froggy->score++;
+		}
+	}
+	
 	// froggy mosquito collision
 	if (CheckCollisionRecs(froggy->hitbox, mosquito->hitbox)) {
 		// if the y value of the frog is bigger than the mosquito, deduce health
@@ -248,11 +327,14 @@ void collision_check_bugs(Frog *froggy, Bug *mosquito) {
 			if (froggy->health >= 0.0) {
 			froggy->health -= 1.8;	
 			}	
-		// otherwise allow the frog to bounce off mosquito for a boost and kill the bug	
-		} else {			
-			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
-			mosquito->alive = DEAD;			
-		}						
+
+			// otherwise allow the frog to bounce off mosquito for a boost and kill the bug						
+			if (mosquito->alive == ALIVE) {			
+				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
+				mosquito->alive = DEAD;	
+				froggy->score++;		
+			}
+		}		
 
 		// frog dies when health goes to 0 . . . .
 		if (froggy->health <= 0) {
@@ -262,6 +344,7 @@ void collision_check_bugs(Frog *froggy, Bug *mosquito) {
 		}
 	}
 }
+
 
 // collision
 void collision_check_pads(Frog *froggy, Lilypad *pad) {	
@@ -455,8 +538,7 @@ int main () {
 	
 	float nextLilypadSpawn = 0.0f;
 
-	// highest y value frog has visited so far
-	// float highestFrogPosition = 0.0f;
+	
 
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
@@ -489,16 +571,16 @@ int main () {
 		}	
 				
 		apply_gravity(&froggy);
-		move_frog(&froggy, maxFrames);			
+		move_frog(&froggy, maxFrames);		
+		frog_attack(&froggy);	
 		apply_velocity(&froggy, GetFrameTime());	
 
 
 		int activePadsAfterLoop = 0;
 		// check collision with pads, remove the ones too far below
 		for (int i = 0; i < activePads; i++) {
-
 			// skip inactive pads
-			if (!pads[i].isActive) continue;
+			// if (!pads[i].isActive) continue;
 			collision_check_pads(&froggy, &pads[i]);			
 			remove_lilypads_below(&pads[i], &froggy); 
 
@@ -512,8 +594,7 @@ int main () {
 		int activeBugsAfterLoop = 0;
 		// update bug movement and collision with bugs and frog
 		for (int i = 0; i < activeBugs; i++) {
-
-			if (!mosquitoes[i].isActive) continue;
+			// if (!mosquitoes[i].isActive) continue;
 			move_bug(&mosquitoes[i], &froggy, GetFrameTime());
 			collision_check_bugs(&froggy, &mosquitoes[i]);
 			deactivate_bug(&mosquitoes[i], &froggy);
@@ -547,14 +628,6 @@ int main () {
 			camera.target.y = minY;
 		}
 
-		// debug 
-		// DrawText(TextFormat("Frame: %d", froggy.frame), 10, 10, 20, WHITE);
-		// DrawText(TextFormat("Is Jumping: %s", froggy.isJumping ? "true" : "false"), 10, 40, 20, WHITE);
-		// DrawText(TextFormat("Frame Timer: %.2f", froggy.frameTimer), 10, 70, 20, WHITE);
-		// DrawText(TextFormat("Jump Timer: %.2f", froggy.jumpTimer), 10, 100, 20, WHITE);
-		// DrawText(TextFormat("Status: %d", froggy.alive), 10, 160, 20, WHITE);
-
-
 		// debugging: visual hitboxes
 		// DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 	
 			
@@ -579,7 +652,7 @@ int main () {
 			);
 			
 			// lilypad hitbox visual
-			DrawRectangleLinesEx(pads[i].hitbox, 1, RED); 
+			// DrawRectangleLinesEx(pads[i].hitbox, 1, RED); 			
 		}
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
@@ -604,9 +677,10 @@ int main () {
 			// change color based on whether alive or not
 			(froggy.alive == ALIVE) ? RAYWHITE : RED);
 			 
+		draw_tongue(&froggy);
+
 		// draw the bugs
 		for (int i = 0; i < activeBugs; i++) {
-
 			Vector2 mosquitoPosition = { 
 				(float)mosquitoes[i].position.x, 
 				(float)mosquitoes[i].position.y
@@ -619,30 +693,37 @@ int main () {
 					frameWidthBug * mosquitoes[i].frame,
 					0,
 					(mosquitoes[i].direction == RIGHT) ? -frameWidthBug : frameWidthBug,
-					mosquitoes[i].texture.height},
+					mosquitoes[i].texture.height * mosquitoes[i].alive},
 				(Rectangle){
 					mosquitoPosition.x,
 					mosquitoPosition.y,
-					frameWidthBug * (float)(GetRandomValue(9, 10) / 10.0),
+					frameWidthBug * GetRandomValue(9,10) / 10.0,
 					// TODO: get this to work -- flip the mosquito when it dies
-					(float)mosquitoes[i].texture.height * (float)mosquitoes[i].alive * (float)(GetRandomValue(9, 10) / 10.0)},
+					(float)mosquitoes[i].texture.height * GetRandomValue(9,10) / 10.0},
 				(Vector2){0,0},
 				0.0f,
-				RAYWHITE);	
+				(mosquitoes[i].alive == ALIVE) ? RAYWHITE : RED);	
 
-			DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 					
+			// DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 					
 		}
 
 		EndMode2D();
 
+		
 		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, WHITE);
+		DrawText(TextFormat("Score: %d", froggy.score), 500, 40, 40, WHITE);
+
+		// debug 
 		DrawText(TextFormat("Position: %.2f", froggy.position.y), 10, 10, 20, WHITE);
 		DrawText(TextFormat("Velocity: %.2f", froggy.velocity.y), 10, 40, 20, WHITE);
 		DrawText(TextFormat("lilypads: %d", activePads), 10, 70, 20, WHITE);
 		DrawText(TextFormat("bugs: %d", activeBugs), 10, 100, 20, WHITE);
 		DrawText(TextFormat("next_spawn: %.2f", nextLilypadSpawn), 10, 130, 20, WHITE);
 		DrawText(TextFormat("acivebugs_after_loop: %d", activeBugsAfterLoop), 10, 160, 20, WHITE);
-		
+		DrawText(TextFormat("frog tongue height: %.2f", froggy.tongue.height), 10, 190, 20, WHITE);
+		DrawText(TextFormat("frog tongue width: %.2f", froggy.tongue.width), 10, 220, 20, WHITE);
+		DrawText(TextFormat("frog tongue x: %.2f", froggy.tongue.x), 10, 250, 20, WHITE);
+		DrawText(TextFormat("frog tongue y: %.2f", froggy.tongue.y), 10, 280, 20, WHITE);
 		// DrawText(TextFormat("current_height: %.2f", currentHeight), 10, 70, 20, WHITE);
 
 
