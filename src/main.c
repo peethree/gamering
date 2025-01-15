@@ -6,7 +6,7 @@
 #define MAX_BUGS 100
 #define MAX_LILLYPADS 1000
 #define FROGGY_HEALTH 10000.0
-#define BUG_SPAWN_INTERVAL 0.5f
+#define BUG_SPAWN_INTERVAL 5.5f
 #define FROGGY_VELOCITY_X 200.0
 #define FROGGY_JUMP_VELOCITY_Y 1100.0
 #define FROGGY_JUMP_VELOCITY_X 380.0
@@ -15,6 +15,7 @@
 
 
 // TODO: 
+// add more bug movement patterns
 // find a better way to deal with level building
 // don't allow mid air jump
 // big tongue shooting out at bugs?
@@ -149,11 +150,11 @@ void move_frog(Frog *froggy, int maxFrames) {
 	}
 }	
 
-void kill_bug(Bug *mosquito) {
-	if (mosquito->alive = DEAD) {
-		// do something
-	}	
-}
+// void kill_bug(Bug *mosquito) {
+// 	if (mosquito->alive = DEAD) {
+// 		// do something
+// 	}	
+// }
 
 // movement bug
 void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {	
@@ -214,6 +215,15 @@ void apply_velocity(Frog *froggy, float deltaTime) {
 	froggy->position.y += froggy->velocity.y * deltaTime;
 }	
 
+void deactivate_bug(Bug *mosquito, Frog *froggy) {	
+	if (mosquito->alive == DEAD) {
+		// deactivate bug at y distance difference			
+		if (mosquito->isActive && (mosquito->position.y > froggy->highestPosition + 800.0f)) {
+			mosquito->isActive = false;
+		}
+	}
+}
+
 void collision_check_bugs(Frog *froggy, Bug *mosquito) {
 	// frog hitbox
 	froggy->hitbox = (Rectangle){
@@ -241,7 +251,7 @@ void collision_check_bugs(Frog *froggy, Bug *mosquito) {
 		// otherwise allow the frog to bounce off mosquito for a boost and kill the bug	
 		} else {			
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
-			mosquito->alive = DEAD;
+			mosquito->alive = DEAD;			
 		}						
 
 		// frog dies when health goes to 0 . . . .
@@ -362,10 +372,8 @@ void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *frog
 
 // set lilypad to inactive
 void deactivate_lilypad(Lilypad *pad) {
-    pad->isActive = false;
-    pad->hitbox = (Rectangle){0, 0, 0, 0};
+    pad->isActive = false;    
 }
-
 
 void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
 	// get the highest y value visited
@@ -501,19 +509,21 @@ int main () {
 		}	
 		activePads = activePadsAfterLoop;
 
+		int activeBugsAfterLoop = 0;
 		// update bug movement and collision with bugs and frog
 		for (int i = 0; i < activeBugs; i++) {
 
 			if (!mosquitoes[i].isActive) continue;
-			// kill_bug(&mosquitoes[i]);
 			move_bug(&mosquitoes[i], &froggy, GetFrameTime());
 			collision_check_bugs(&froggy, &mosquitoes[i]);
-
-			// update activeBugs when one is killed
-			// if (mosquitoes[i].alive == DEAD) {
-			// 	activeBugs--;
-			// }			
-		}			
+			deactivate_bug(&mosquitoes[i], &froggy);
+			
+			// remove inactive mosquitoes after the loop 
+			if (mosquitoes[i].isActive) {
+				mosquitoes[activeBugsAfterLoop++] = mosquitoes[i];
+			}			
+		}	
+		activeBugs = activeBugsAfterLoop;		
 
 		// if froggy below ground, put it back on ground
     	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
@@ -631,6 +641,7 @@ int main () {
 		DrawText(TextFormat("lilypads: %d", activePads), 10, 70, 20, WHITE);
 		DrawText(TextFormat("bugs: %d", activeBugs), 10, 100, 20, WHITE);
 		DrawText(TextFormat("next_spawn: %.2f", nextLilypadSpawn), 10, 130, 20, WHITE);
+		DrawText(TextFormat("acivebugs_after_loop: %d", activeBugsAfterLoop), 10, 160, 20, WHITE);
 		
 		// DrawText(TextFormat("current_height: %.2f", currentHeight), 10, 70, 20, WHITE);
 
