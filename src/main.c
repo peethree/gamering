@@ -4,26 +4,31 @@
 #include "resource_dir.h"	
 
 #define MAX_BUGS 100
-#define MAX_LILLYPADS 1000
-#define FROGGY_HEALTH 1000.0
 #define BUG_SPAWN_INTERVAL 0.5f
+
+#define MAX_LILLYPADS 1000
+#define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
+
+#define FROGGY_HEALTH 100.0
 #define FROGGY_VELOCITY_X 200.0
 #define FROGGY_JUMP_VELOCITY_Y 1100.0
 #define FROGGY_JUMP_VELOCITY_X 380.0
 #define FROGGY_FALL_VELOCITY 450.0
-#define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
-
-#define MAX_TONGUE_LENGTH 350.0f
-#define ATTACK_DURATION 0.4f
-#define TONGUE_GROWTH_SPEED 800.0f
-#define TONGUE_WIDTH 5.0f
+#define FROGGY_TONGUE_LENGTH 350.0f
+#define FROGGY_ATTACK_DURATION 0.4f
+#define FROGGY_TONGUE_WIDTH 5.0f
 
 // TODO: 
+// keep track of highscore 
+// clean up bugs too far off screen!
+// add some kind of menu when the game is over
 // add more bug movement patterns
 // add proximity based bug buzzing
 // find a better way to deal with level building
 // don't allow mid air jump
+// fix successfully jumping on mosquitoes taking away health
 // multiplayer?
+
 
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
@@ -73,12 +78,17 @@ typedef struct Bug{
 	Vector2 targetPosition;
 	Vector2 desiredVelocity;
 	Rectangle previousPosition;
+	bool isActive;
+	// heatseeking movement
 	float angle;
 	float radius;
 	float spiralSpeed;
 	float convergence;	
-	float minRadius; 	
-	bool isActive;	
+	float minRadius; 
+	// wave movement
+	Vector2 spawnPosition;
+	float waveFrequency;
+	float waveAmplitude;			
 } Bug;
 
 // platforms to jump on for the frog
@@ -128,7 +138,7 @@ void move_frog(Frog *froggy, int maxFrames) {
 			froggy->direction = LEFT;
 		}
 
-		// jump (prevent double jumps)
+		// jump (prevent double jumps) TODO: fix mid air jump
 		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
 			froggy->isJumping = true;
@@ -169,7 +179,7 @@ void frog_attack(Frog *froggy) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking) {
         froggy->isAttacking = true;
         froggy->tongueTimer = 0.0f;
-        froggy->attackDuration = ATTACK_DURATION;
+        froggy->attackDuration = FROGGY_ATTACK_DURATION;
     }
 
     // attack animation
@@ -187,7 +197,7 @@ void frog_attack(Frog *froggy) {
         }
 
         // tongue length calculation
-        float currentLength = MAX_TONGUE_LENGTH * progress;
+        float currentLength = FROGGY_TONGUE_LENGTH * progress;
 
         // tongue position is based on froggy direction
 		// facing right
@@ -196,7 +206,7 @@ void frog_attack(Frog *froggy) {
                 froggy->position.x + 45.0f,  
                 froggy->position.y + 10.0f,  
                 currentLength,
-                TONGUE_WIDTH
+                FROGGY_TONGUE_WIDTH
             };
 		// facing left
         } else {
@@ -204,7 +214,7 @@ void frog_attack(Frog *froggy) {
                 froggy->position.x - currentLength + 15.0f,  
                 froggy->position.y + 10.0f,
                 currentLength,
-                TONGUE_WIDTH
+                FROGGY_TONGUE_WIDTH
             };
         }
 
@@ -223,6 +233,24 @@ void draw_tongue(Frog *froggy) {
 	if (froggy->isAttacking) {
         DrawRectangleRec(froggy->tongue, RED); 
 		// DrawRectangleRec(froggy->tongueHitbox, WHITE);
+	}
+}
+
+void wave_bug(Bug *mosquito) {	
+	// mosquito->previousPosition.x = mosquito->position.x;
+	if (mosquito->alive == ALIVE) {
+		mosquito->waveAmplitude = 60.0f;
+		mosquito->waveFrequency = 5.5f;
+		mosquito->velocity.x = 360.0f;
+		mosquito->angle += GetFrameTime();	
+
+		// update position
+		mosquito->position.x += (float)mosquito->direction * mosquito->velocity.x * GetFrameTime();
+		mosquito->position.y = mosquito->spawnPosition.y + mosquito->waveAmplitude * sinf(mosquito->waveFrequency * mosquito->angle);
+	} else {
+		// bug should fall off the screen	
+		mosquito->velocity.y = 300.0;
+		mosquito->position.y += mosquito->velocity.y * GetFrameTime();	
 	}
 }
 
@@ -273,7 +301,7 @@ void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {
 		}
 	}
 
-	// bug should fall down off the screen
+	// bug should fall off the screen
 	if (mosquito->alive == DEAD) {
 		mosquito->velocity.y = 300.0;
 		mosquito->position.y += mosquito->velocity.y * GetFrameTime();
@@ -323,13 +351,13 @@ void collision_check_bugs(Frog *froggy, Bug *mosquito) {
 	// froggy mosquito collision
 	if (CheckCollisionRecs(froggy->hitbox, mosquito->hitbox)) {
 		// if the y value of the frog is bigger than the mosquito, deduce health
-		if (froggy->position.y > mosquito->position.y) {		
+		if (froggy->position.y < mosquito->position.y) {		
 			if (froggy->health >= 0.0) {
 			froggy->health -= 1.8;	
 			}	
 
 			// otherwise allow the frog to bounce off mosquito for a boost and kill the bug						
-			if (mosquito->alive == ALIVE) {			
+			if (froggy->alive == ALIVE && mosquito->alive == ALIVE) {			
 				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
 				mosquito->alive = DEAD;	
 				froggy->score++;		
@@ -412,11 +440,31 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 void spawn_bug(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {	
 	// initialize bug(s)
     mosquito->texture = mosquito_texture;
-    mosquito->position = (Rectangle){
-		froggy->position.x + (float)GetRandomValue(-250, 250), 
-		froggy->position.y + (float)GetRandomValue(200, 300), 0.0f, 36.0f
-	};
-    mosquito->direction = LEFT;
+
+	// this i had for move_bug function
+
+    // mosquito->position = (Rectangle){
+	// 	froggy->position.x + (float)GetRandomValue(-250, 250), 
+	// 	froggy->position.y + (float)GetRandomValue(200, 300), 
+	// 	0.0f, 
+	// 	36.0f
+	// };
+
+	mosquito->position = (Rectangle){
+		froggy->position.x + (GetRandomValue(0, 1) == 0 ? -1000.0f : 1000.0f),
+		froggy->position.y - GetRandomValue(-500, -400), 
+		0.0f, 
+		36.0f
+	};	
+
+	mosquito->spawnPosition = (Vector2){ mosquito->position.x, mosquito->position.y };
+    // mosquito->direction = LEFT;
+	if (mosquito->spawnPosition.x < froggy->position.x) {
+		mosquito->direction = RIGHT;
+	} else {
+		mosquito->direction = LEFT;
+	}
+	// mosquito->direction = GetRandomValue(true, false) ? LEFT : RIGHT;
     mosquito->frame = 0;
     mosquito->angle = 0.0f;
     mosquito->radius = (float)GetRandomValue(500, 700);	
@@ -546,7 +594,7 @@ int main () {
 		// update
 		bugSpawnTimer += GetFrameTime();
 
-		// spawn bugs every 0.5f
+		// spawn bugs 
 		if (bugSpawnTimer >= BUG_SPAWN_INTERVAL && activeBugs < MAX_BUGS) {
 			spawn_bug(&mosquitoes[activeBugs], &froggy, mosquito_texture);
 			activeBugs++;
@@ -578,9 +626,7 @@ int main () {
 
 		int activePadsAfterLoop = 0;
 		// check collision with pads, remove the ones too far below
-		for (int i = 0; i < activePads; i++) {
-			// skip inactive pads
-			// if (!pads[i].isActive) continue;
+		for (int i = 0; i < activePads; i++) {	
 			collision_check_pads(&froggy, &pads[i]);			
 			remove_lilypads_below(&pads[i], &froggy); 
 
@@ -595,7 +641,10 @@ int main () {
 		// update bug movement and collision with bugs and frog
 		for (int i = 0; i < activeBugs; i++) {
 			// if (!mosquitoes[i].isActive) continue;
-			move_bug(&mosquitoes[i], &froggy, GetFrameTime());
+
+			wave_bug(&mosquitoes[i]);
+			// move_bug(&mosquitoes[i], &froggy, GetFrameTime());
+
 			collision_check_bugs(&froggy, &mosquitoes[i]);
 			deactivate_bug(&mosquitoes[i], &froggy);
 			
@@ -679,6 +728,8 @@ int main () {
 			 
 		draw_tongue(&froggy);
 
+		DrawText(TextFormat("pos.x: %.2f", froggy.position.x), 10, 310, 20, WHITE);
+
 		// draw the bugs
 		for (int i = 0; i < activeBugs; i++) {
 			Vector2 mosquitoPosition = { 
@@ -697,14 +748,15 @@ int main () {
 				(Rectangle){
 					mosquitoPosition.x,
 					mosquitoPosition.y,
-					frameWidthBug * GetRandomValue(9,10) / 10.0,
-					// TODO: get this to work -- flip the mosquito when it dies
+					frameWidthBug * GetRandomValue(9,10) / 10.0,					
 					(float)mosquitoes[i].texture.height * GetRandomValue(9,10) / 10.0},
 				(Vector2){0,0},
 				0.0f,
 				(mosquitoes[i].alive == ALIVE) ? RAYWHITE : RED);	
 
-			// DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 					
+			// DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 
+			// DrawText(TextFormat("spawn Position y: %.2f", mosquitoes[i].spawnPosition.y), 10, 310 + 20 * i, 20, WHITE);	
+			// DrawText(TextFormat("spawn Position x: %.2f", mosquitoes[i].spawnPosition.x), 10, 330 + 20 * i, 20, WHITE);				
 		}
 
 		EndMode2D();
