@@ -174,6 +174,19 @@ void move_frog(Frog *froggy, int maxFrames) {
 	}
 }	
 
+void screen_flip(Frog *froggy) {
+	// allow movement from left side of the screen to right side 
+
+	// 8 pixel grids / frames in the texture image -> divide by 8
+	if (froggy->position.x < 0.0f - froggy->texture.width / 8) {
+		froggy->position.x = (float)GetScreenWidth();
+	}
+
+	if (froggy->position.x > (float)GetScreenWidth() + froggy->texture.width / 8) {
+		froggy->position.x = 0.0f;
+	}
+}
+ 
 void frog_attack(Frog *froggy) {
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking) {
@@ -271,7 +284,7 @@ void move_bug(Bug *mosquito, Frog *froggy, float deltaTime) {
 			mosquito->convergence += 0.1;
 		}
 
-		// convert radius, angle -> x, y
+		// convert radius and angle into x, y coordinates
 		float mosquito_x = mosquito->radius * cosf(mosquito->angle); 
 		float mosquito_y = mosquito->radius * sinf(mosquito->angle);	
 
@@ -618,6 +631,7 @@ int main () {
 			nextLilypadSpawn -= 400.0f;
 		}	
 				
+		screen_flip(&froggy);
 		apply_gravity(&froggy);
 		move_frog(&froggy, maxFrames);		
 		frog_attack(&froggy);	
