@@ -5,6 +5,7 @@
 
 #define MAX_MOSQUITOES 100
 #define MOSQUITO_SPAWN_INTERVAL 0.5f
+
 #define MAX_WASPS 10
 #define WASP_SPAWN_INTERVAL 5.0f
 
@@ -21,6 +22,7 @@
 #define FROGGY_TONGUE_WIDTH 5.0f
 
 // TODO: 
+// make a cool wasp Sprite
 // keep track of highscore 
 // add some kind of menu when the game is over
 // add more bug movement patterns
@@ -191,8 +193,8 @@ void screen_flip(Frog *froggy) {
 }
  
 void frog_attack(Frog *froggy) {
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking) {
+	
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && froggy->alive == ALIVE) {
         froggy->isAttacking = true;
         froggy->tongueTimer = 0.0f;
         froggy->attackDuration = FROGGY_ATTACK_DURATION;
@@ -251,8 +253,9 @@ void draw_tongue(Frog *froggy) {
 	}
 }
 
-void wave_bug(Bug *mosquito) {	
-	// mosquito->previousPosition.x = mosquito->position.x;
+// movement mosquito
+void move_mosquito(Bug *mosquito) {	
+	
 	if (mosquito->alive == ALIVE) {
 		mosquito->waveAmplitude = 60.0f;
 		mosquito->waveFrequency = 5.5f;
@@ -269,7 +272,8 @@ void wave_bug(Bug *mosquito) {
 	}
 }
 
-// movement bug
+// TODO: maybe invert the spiral so the wasp doesn't auto kill itself
+// movement wasp
 void move_wasp(Bug *wasp, Frog *froggy) {	
 
 	if (wasp->alive == ALIVE) {
@@ -309,6 +313,7 @@ void move_wasp(Bug *wasp, Frog *froggy) {
 		// if horizontal movement is +x flip frame right, if -x flip frame pointing left
 		float dif = wasp->position.x - wasp->previousPosition.x;
 
+		// TODO: implemetn wasp sprite with at least 2 frames
 		if (dif > 0.0) {
 			wasp->frame = 1;
 		} else {
@@ -316,7 +321,7 @@ void move_wasp(Bug *wasp, Frog *froggy) {
 		}
 	}
 
-	// bug should fall off the screen
+	// dead bug should fall off the screen
 	if (wasp->alive == DEAD) {
 		wasp->velocity.y = 300.0;
 		wasp->position.y += wasp->velocity.y * GetFrameTime();
@@ -329,8 +334,8 @@ void apply_velocity(Frog *froggy, float deltaTime) {
 	froggy->position.y += froggy->velocity.y * deltaTime;
 }	
 
+// clean up bugs too far away from the froggy 
 void deactivate_bug(Bug *bug, Frog *froggy) {	
-
 	// deactivate bug at y distance difference			
 	if (bug->isActive && (bug->position.y > froggy->position.y + 1000.0f)) {
 		bug->isActive = false;
@@ -383,7 +388,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 	// froggy bug collision
 	if (CheckCollisionRecs(froggy->hitbox, bug->hitbox)) {
 		// if the y value of the frog is bigger than the bug, deduce health
-		if (froggy->position.y < bug->position.y) {		
+		if (froggy->position.y < bug->position.y - 10.0f) {		
 			if (froggy->health >= 0.0) {
 				if (bug->type == "mosquito") {
 					froggy->health -= 1.8;	
@@ -393,6 +398,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 				}
 			}	
 
+			// TODO: froggy shouldn't lose hp on succesful jump kill
 			// otherwise allow the frog to bounce off bug for a boost and kill the bug						
 			if (froggy->alive == ALIVE && bug->alive == ALIVE) {			
 				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
@@ -679,6 +685,7 @@ int main () {
 			}
 		}
 
+		// TODO: this needs looked at still
 		// keep spawning lilypads, this time offscreen
 		if (froggy.position.y < nextLilypadSpawn) {
 			for (int i = 0; i < OFFSCREEN_LILYPAD_SPAWN_AMOUNT && i < MAX_LILLYPADS; i++) {
@@ -710,7 +717,7 @@ int main () {
 		// update mosquitoes
 		int activeMosquitoesAfterLoop = 0;		
 		for (int i = 0; i < activeMosquitoes; i++) {	
-			wave_bug(&mosquitoes[i]);	
+			move_mosquito(&mosquitoes[i]);	
 			collision_check_bugs(&froggy, &mosquitoes[i]);
 			deactivate_bug(&mosquitoes[i], &froggy);
 			
@@ -806,8 +813,6 @@ int main () {
 			 
 		draw_tongue(&froggy);
 
-		DrawText(TextFormat("pos.x: %.2f", froggy.position.x), 10, 310, 20, WHITE);
-
 		// draw the bugs
 		for (int i = 0; i < activeMosquitoes; i++) {									
 
@@ -851,7 +856,6 @@ int main () {
 		}
 
 		EndMode2D();
-
 		
 		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, WHITE);
 		DrawText(TextFormat("Score: %d", froggy.score), 500, 40, 40, WHITE);
@@ -870,7 +874,7 @@ int main () {
 		DrawText(TextFormat("acive wasps: %d", activeWasps), 10, 310, 20, WHITE);
 		
 
-		// DrawText(TextFormat("current_height: %.2f", currentHeight), 10, 70, 20, WHITE);a
+		
 
 
 		if (froggy.alive == DEAD) {
