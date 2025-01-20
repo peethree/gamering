@@ -59,7 +59,7 @@ typedef struct Frog{
     float tongueTimer;
     float attackDuration;
 	float health;
-	Status alive;	
+	Status status;	
 	bool isJumping; 
 	bool isBouncing;		
 	int frame;
@@ -77,7 +77,7 @@ typedef struct Bug{
 	Direction direction;
 	Rectangle hitbox;
 	int frame;
-	Status alive;	
+	Status status;	
 	Vector2 targetPosition;
 	Vector2 desiredVelocity;
 	Rectangle previousPosition;
@@ -92,7 +92,6 @@ typedef struct Bug{
 	Vector2 spawnPosition;
 	float waveFrequency;
 	float waveAmplitude;
-
 	char* type;			
 } Bug;
 
@@ -115,14 +114,14 @@ void apply_gravity(Frog *froggy) {
 }
 
 // movement	frog
-void move_frog(Frog *froggy, int maxFrames) {
+void move_frog(Frog *froggy, int maxFrames, float deltaTime) {
 
 	const float frameDuration = 0.25f;  
 	const float jumpDuration = 1.4f;   
 
 	froggy->velocity.x = 0.0;
 
-	if (froggy->alive == ALIVE) {
+	if (froggy->status == ALIVE) {
 		// side movement
 		if (IsKeyDown(KEY_D)) {
 			if (froggy->isJumping) {
@@ -155,7 +154,7 @@ void move_frog(Frog *froggy, int maxFrames) {
 		}
 		
 		if (froggy->isJumping) {			
-			froggy->frameTimer += GetFrameTime();
+			froggy->frameTimer += deltaTime;
 			
 			if (froggy->frameTimer >= frameDuration) {
 				froggy->frameTimer = 0.0f;
@@ -165,7 +164,7 @@ void move_frog(Frog *froggy, int maxFrames) {
 			}
 			
 			// countdown jumptimer to 0
-			froggy->jumpTimer -= GetFrameTime();
+			froggy->jumpTimer -= deltaTime;
 			if (froggy->jumpTimer <= 0.0f) {
 				froggy->jumpTimer = 0.0f; 
 
@@ -192,9 +191,9 @@ void screen_flip(Frog *froggy) {
 	}
 }
  
-void frog_attack(Frog *froggy) {
+void frog_attack(Frog *froggy, float deltaTime) {
 	
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && froggy->alive == ALIVE) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && froggy->status == ALIVE) {
         froggy->isAttacking = true;
         froggy->tongueTimer = 0.0f;
         froggy->attackDuration = FROGGY_ATTACK_DURATION;
@@ -202,7 +201,7 @@ void frog_attack(Frog *froggy) {
 
     // attack animation
     if (froggy->isAttacking) {
-        froggy->tongueTimer += GetFrameTime();
+        froggy->tongueTimer += deltaTime;
         float progress;
 
         // tongue extends
@@ -254,38 +253,38 @@ void draw_tongue(Frog *froggy) {
 }
 
 // movement mosquito
-void move_mosquito(Bug *mosquito) {	
+void move_mosquito(Bug *mosquito, float deltaTime) {	
 	
-	if (mosquito->alive == ALIVE) {
+	if (mosquito->status == ALIVE) {
 		mosquito->waveAmplitude = 60.0f;
 		mosquito->waveFrequency = 5.5f;
 		mosquito->velocity.x = 360.0f;
-		mosquito->angle += GetFrameTime();	
+		mosquito->angle += deltaTime;	
 
 		// update position
-		mosquito->position.x += (float)mosquito->direction * mosquito->velocity.x * GetFrameTime();
+		mosquito->position.x += (float)mosquito->direction * mosquito->velocity.x * deltaTime;
 		mosquito->position.y = mosquito->spawnPosition.y + mosquito->waveAmplitude * sinf(mosquito->waveFrequency * mosquito->angle);
 	} else {
 		// bug should fall off the screen	
 		mosquito->velocity.y = 300.0;
-		mosquito->position.y += mosquito->velocity.y * GetFrameTime();	
+		mosquito->position.y += mosquito->velocity.y * deltaTime;	
 	}
 }
 
 // TODO: maybe invert the spiral so the wasp doesn't auto kill itself
 // movement wasp
-void move_wasp(Bug *wasp, Frog *froggy) {	
+void move_wasp(Bug *wasp, Frog *froggy, float deltaTime) {	
 
-	if (wasp->alive == ALIVE) {
+	if (wasp->status == ALIVE) {
 		// previous position for frame flipping
 		wasp->previousPosition.x = wasp->position.x;
 
 		// update angle
-		wasp->angle += wasp->spiralSpeed * GetFrameTime();
+		wasp->angle += wasp->spiralSpeed * deltaTime;
 
 		// decrease radius from froggy
 		if (wasp->radius > wasp->minRadius) {
-			wasp->radius -= wasp->convergence * GetFrameTime();
+			wasp->radius -= wasp->convergence * deltaTime;
 			// increase the convergence over time
 			wasp->convergence += 0.1;
 		}
@@ -307,8 +306,8 @@ void move_wasp(Bug *wasp, Frog *froggy) {
 		wasp->velocity.y += (wasp->desiredVelocity.y - wasp->velocity.y) * 0.2f;
 
 		// apply velocity with delay modifier from previous block
-		wasp->position.x += wasp->velocity.x * GetFrameTime();
-		wasp->position.y += wasp->velocity.y * GetFrameTime();	
+		wasp->position.x += wasp->velocity.x * deltaTime;
+		wasp->position.y += wasp->velocity.y * deltaTime;	
 		
 		// if horizontal movement is +x flip frame right, if -x flip frame pointing left
 		float dif = wasp->position.x - wasp->previousPosition.x;
@@ -322,9 +321,9 @@ void move_wasp(Bug *wasp, Frog *froggy) {
 	}
 
 	// dead bug should fall off the screen
-	if (wasp->alive == DEAD) {
+	if (wasp->status == DEAD) {
 		wasp->velocity.y = 300.0;
-		wasp->position.y += wasp->velocity.y * GetFrameTime();
+		wasp->position.y += wasp->velocity.y * deltaTime;
 	}
 }
 
@@ -378,9 +377,9 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 
 
 	// when the tongue hits a bug, kill it, increment score
-	if (bug->alive == ALIVE) {
+	if (bug->status == ALIVE) {
 		if (CheckCollisionRecs(froggy->tongueHitbox, bug->hitbox)) {
-			bug->alive = DEAD;
+			bug->status = DEAD;
 			froggy->score++;
 		}
 	}
@@ -400,9 +399,9 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 
 			// TODO: froggy shouldn't lose hp on succesful jump kill
 			// otherwise allow the frog to bounce off bug for a boost and kill the bug						
-			if (froggy->alive == ALIVE && bug->alive == ALIVE) {			
+			if (froggy->status == ALIVE && bug->status == ALIVE) {			
 				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
-				bug->alive = DEAD;	
+				bug->status = DEAD;	
 				froggy->score++;		
 			}
 		}		
@@ -410,7 +409,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 		// frog dies when health goes to 0 . . . .
 		if (froggy->health <= 0) {
 			froggy->health = 0;
-			froggy->alive = DEAD;	
+			froggy->status = DEAD;	
 			froggy->frame = 5;		
 		}
 	}
@@ -506,7 +505,7 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {
     mosquito->spiralSpeed = (float)GetRandomValue(-3,3);
     mosquito->convergence = (float)GetRandomValue(12,18);
     mosquito->minRadius = 3.0f;	
-	mosquito->alive = ALIVE;
+	mosquito->status = ALIVE;
 	mosquito->isActive = true;
 
 	mosquito->type = "mosquito";
@@ -530,7 +529,7 @@ void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {
     wasp->spiralSpeed = (float)GetRandomValue(-3,3);
     wasp->convergence = (float)GetRandomValue(12,18);
     wasp->minRadius = 3.0f;	
-	wasp->alive = ALIVE;
+	wasp->status = ALIVE;
 	wasp->isActive = true;
 
 	wasp->type = "wasp";
@@ -561,10 +560,7 @@ void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *frog
 	pad->isActive = true;
 }
 
-// set lilypad to inactive
-void deactivate_lilypad(Lilypad *pad) {
-    pad->isActive = false;    
-}
+
 
 void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
 	// get the highest y value visited
@@ -574,7 +570,7 @@ void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
 
 	// remove lilypads when froggy has climbed certain distance
     if (pad->isActive && pad->position.y > froggy->highestPosition + 1500.0f) {
-        deactivate_lilypad(pad);
+        pad->isActive = false;
     }
 }
 
@@ -606,7 +602,7 @@ int main () {
 		.jumpTimer = 0.0f,   
 		.frameTimer = 0.0f,		
 		.health = FROGGY_HEALTH,
-		.alive = ALIVE,
+		.status = ALIVE,
 		.highestPosition = 0.0f,
 		.isBouncing = false
 	};					
@@ -658,8 +654,11 @@ int main () {
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
+
 		// updates
-		mosquitoSpawnTimer += GetFrameTime();
+		float deltaTime = GetFrameTime();
+
+		mosquitoSpawnTimer += deltaTime;
 
 		// spawn mosquitoes 
 		if (mosquitoSpawnTimer >= MOSQUITO_SPAWN_INTERVAL && activeMosquitoes < MAX_MOSQUITOES) {
@@ -668,7 +667,7 @@ int main () {
 			mosquitoSpawnTimer = 0.0f;	
 		}
 
-		waspSpawnTimer += GetFrameTime();
+		waspSpawnTimer += deltaTime;
 
 		// spawn wasp
 		if (waspSpawnTimer >= WASP_SPAWN_INTERVAL && activeWasps < MAX_WASPS) {
@@ -697,9 +696,9 @@ int main () {
 				
 		screen_flip(&froggy);
 		apply_gravity(&froggy);
-		move_frog(&froggy, maxFrames);		
-		frog_attack(&froggy);	
-		apply_velocity(&froggy, GetFrameTime());	
+		move_frog(&froggy, maxFrames, deltaTime);		
+		frog_attack(&froggy, deltaTime);	
+		apply_velocity(&froggy, deltaTime);	
 
 		// update lillypads
 		int activePadsAfterLoop = 0;		
@@ -717,7 +716,7 @@ int main () {
 		// update mosquitoes
 		int activeMosquitoesAfterLoop = 0;		
 		for (int i = 0; i < activeMosquitoes; i++) {	
-			move_mosquito(&mosquitoes[i]);	
+			move_mosquito(&mosquitoes[i], deltaTime);	
 			collision_check_bugs(&froggy, &mosquitoes[i]);
 			deactivate_bug(&mosquitoes[i], &froggy);
 			
@@ -731,9 +730,10 @@ int main () {
 		// update wasps		
 		int activeWaspsAfterLoop = 0;
 		for (int i = 0; i < activeWasps; i++) {
-			move_wasp(&wasps[i], &froggy);
+			move_wasp(&wasps[i], &froggy, deltaTime);
 			collision_check_bugs(&froggy, &wasps[i]);
 			deactivate_bug(&wasps[i], &froggy);
+
 			if (wasps[i].isActive) {
 				wasps[activeWaspsAfterLoop++] = wasps[i];
 			}	
@@ -806,10 +806,10 @@ int main () {
 				// flip the texture horizontally depending on direction it's facing
 				(froggy.direction == RIGHT) ? -frameWidth : frameWidth,	
 				// flip the texture vertically when the frog is dead			
-				froggy.texture.height * froggy.alive}, 
+				froggy.texture.height * froggy.status}, 
 			frogPosition, 
 			// change color based on whether alive or not
-			(froggy.alive == ALIVE) ? RAYWHITE : RED);
+			(froggy.status == ALIVE) ? RAYWHITE : RED);
 			 
 		draw_tongue(&froggy);
 
@@ -823,7 +823,7 @@ int main () {
 					frameWidthBug * mosquitoes[i].frame,
 					0,
 					(mosquitoes[i].direction == RIGHT) ? -frameWidthBug : frameWidthBug,
-					mosquitoes[i].texture.height * mosquitoes[i].alive},
+					mosquitoes[i].texture.height * mosquitoes[i].status},
 				(Rectangle){
 					mosquitoes[i].position.x,
 					mosquitoes[i].position.y,
@@ -831,7 +831,7 @@ int main () {
 					(float)mosquitoes[i].texture.height * GetRandomValue(9,10) / 10.0},
 				(Vector2){0,0},
 				0.0f,
-				(mosquitoes[i].alive == ALIVE) ? RAYWHITE : RED);		
+				(mosquitoes[i].status == ALIVE) ? RAYWHITE : RED);		
 
 			// DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 
 			// DrawText(TextFormat("spawn Position y: %.2f", mosquitoes[i].spawnPosition.y), 10, 310 + 20 * i, 20, WHITE);	
@@ -873,11 +873,7 @@ int main () {
 		DrawText(TextFormat("frog tongue y: %.2f", froggy.tongue.y), 10, 280, 20, WHITE);
 		DrawText(TextFormat("acive wasps: %d", activeWasps), 10, 310, 20, WHITE);
 		
-
-		
-
-
-		if (froggy.alive == DEAD) {
+		if (froggy.status == DEAD) {
 			DrawText("FROGGY HAS PERISHED", 400, 400, 42, RED);
 		}
 
