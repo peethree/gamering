@@ -7,7 +7,7 @@
 #define MOSQUITO_SPAWN_INTERVAL 0.5f
 
 #define MAX_WASPS 10
-#define WASP_SPAWN_INTERVAL 555.0f
+#define WASP_SPAWN_INTERVAL 5.0f
 
 #define MAX_LILLYPADS 1000
 #define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
@@ -245,8 +245,8 @@ void frog_attack(Frog *froggy, float deltaTime) {
         // reset hitbox when attack is over
         if (froggy->tongueTimer >= froggy->attackDuration) {
             froggy->isAttacking = false;
-            froggy->tongue = (Rectangle){0, 0, 0, 0};
-            froggy->tongueHitbox = (Rectangle){0, 0, 0, 0};
+            froggy->tongue = (Rectangle){800, 1280, 0, 0};
+            froggy->tongueHitbox = (Rectangle){800, 1280, 0, 0};
         }
     }
 }
@@ -346,7 +346,7 @@ void deactivate_bug(Bug *bug, Frog *froggy) {
 	}
 
 	// and x difference (these numbers need to be further than where the bugs spawn)
-	if (bug->isActive && (bug->position.x > 1500.0f || bug->position.x < -900.0f)) {
+	if (bug->isActive && ((bug->direction == RIGHT && bug->position.x > 1500.0f) || (bug->direction == LEFT && bug->position.x < -900.0f))) {
 		bug->isActive = false;
 	}	
 }
@@ -404,9 +404,9 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 			}	
 
 			// bump froggy down when trying to jump through a bug
-			froggy->velocity.y = 0.25 * FROGGY_BUMP_VELOCITY_Y;
+			froggy->velocity.y = 0.10 * FROGGY_BUMP_VELOCITY_Y;
 
-			// TODO: get horizontal bump to work
+			// TODO: get horizontal bump to work // add a graceperiod so bug damage is more consistent
 			// froggy is further left than bug
 			if (froggy->position.x < bug->position.x) {
 				froggy->velocity.x = -FROGGY_BUMP_VELOCITY_X;
@@ -437,8 +437,6 @@ void froggy_death(Frog *froggy) {
 		froggy->frame = 5;		
 	}
 }
-
-
 
 // collision
 void collision_check_pads(Frog *froggy, Lilypad *pad) {	
@@ -516,22 +514,16 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {
 
 	mosquito->spawnPosition = (Vector2){ mosquito->position.x, mosquito->position.y };
 
-	if (mosquito->spawnPosition.x < froggy->position.x) {
-		mosquito->direction = RIGHT;
-	} else {
-		mosquito->direction = LEFT;
-	}
+    if (mosquito->spawnPosition.x < 640.0f) { 
+        mosquito->direction = RIGHT;          
+    } else {
+        mosquito->direction = LEFT;         
+    }
+
 	// mosquito->direction = GetRandomValue(true, false) ? LEFT : RIGHT;
     mosquito->frame = 0;
-    mosquito->angle = 0.0f;
-    mosquito->radius = (float)GetRandomValue(500, 700);	
-	// TODO: spiralspeed 0 should be prevented?
-    mosquito->spiralSpeed = (float)GetRandomValue(-3,3);
-    mosquito->convergence = (float)GetRandomValue(12,18);
-    mosquito->minRadius = 3.0f;	
 	mosquito->status = ALIVE;
 	mosquito->isActive = true;
-
 	mosquito->type = "mosquito";
 }
 
@@ -555,7 +547,6 @@ void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {
     wasp->minRadius = 3.0f;	
 	wasp->status = ALIVE;
 	wasp->isActive = true;
-
 	wasp->type = "wasp";
 }
 
@@ -563,7 +554,7 @@ void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
 	// initialize the platforms	
 	pad->texture = lilypad_texture;
 	pad->position = (Rectangle){
-		.x = froggy->position.x + GetRandomValue(-800, 600),
+		.x = froggy->position.x + GetRandomValue(-700, 600),
 		.y = froggy->position.y + GetRandomValue(-1600, 300),
 		.width = 0.0,
 		.height = 36.0,
@@ -628,8 +619,10 @@ int main () {
 		.health = FROGGY_HEALTH,
 		.status = ALIVE,
 		.highestPosition = 0.0f,
-		.isBouncing = false
-	};					
+		.isBouncing = false,
+		.tongue = (Rectangle){800, 1280, 0, 0},
+		.tongueHitbox = (Rectangle){800, 1280, 0, 0}
+	};		
 
 	// 8 pictures on the frog sprite sheet -> 
 	const float frameWidth = (float)(frog_texture.width / 8);
