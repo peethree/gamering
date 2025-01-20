@@ -7,7 +7,7 @@
 #define MOSQUITO_SPAWN_INTERVAL 0.5f
 
 #define MAX_WASPS 10
-#define WASP_SPAWN_INTERVAL 5.0f
+#define WASP_SPAWN_INTERVAL 555.0f
 
 #define MAX_LILLYPADS 1000
 #define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
@@ -16,6 +16,8 @@
 #define FROGGY_VELOCITY_X 200.0
 #define FROGGY_JUMP_VELOCITY_Y 1100.0
 #define FROGGY_JUMP_VELOCITY_X 380.0
+#define FROGGY_BUMP_VELOCITY_Y 825
+#define FROGGY_BUMP_VELOCITY_X 380.0
 #define FROGGY_FALL_VELOCITY 450.0
 #define FROGGY_TONGUE_LENGTH 350.0f
 #define FROGGY_ATTACK_DURATION 0.4f
@@ -29,8 +31,11 @@
 // add proximity based bug buzzing
 // find a better way to deal with level building
 // don't allow mid air jump
+
 // fix successfully jumping on mosquitoes taking away health
+
 // multiplayer?
+
 
 
 // cool backgrounds, stages that change depending on y value
@@ -347,6 +352,7 @@ void deactivate_bug(Bug *bug, Frog *froggy) {
 }
 
 void collision_check_bugs(Frog *froggy, Bug *bug) {
+	// hitboxes need to be updated every loop	
 	// frog hitbox
 	froggy->hitbox = (Rectangle){
 		.x = froggy->position.x + 10.0f,
@@ -355,8 +361,8 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 		.height = 35.0f
 	};
 
-	if (bug->type == "mosquito") {
-		// mosquito hitbox
+	// mosquito hitbox
+	if (bug->type == "mosquito") {	
 		bug->hitbox = (Rectangle){
 			.x = bug->position.x + 13.0f,
 			.y = bug->position.y + 1.0f,
@@ -365,8 +371,8 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 		};
 	}
 
-	if (bug->type == "wasp") {
-		// wasp hitbox
+	// wasp hitbox
+	if (bug->type == "wasp") {		
 		bug->hitbox = (Rectangle) {
 			.x = bug->position.x + 40.0f,
 			.y = bug->position.y + 1.0f,
@@ -385,9 +391,9 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 	}
 	
 	// froggy bug collision
-	if (CheckCollisionRecs(froggy->hitbox, bug->hitbox)) {
-		// if the y value of the frog is bigger than the bug, deduce health
-		if (froggy->position.y < bug->position.y - 10.0f) {		
+	if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) && bug->status == ALIVE) {
+		// froggy is hitting the bug from the bottom
+		if (froggy->position.y > bug->position.y) {		
 			if (froggy->health >= 0.0) {
 				if (bug->type == "mosquito") {
 					froggy->health -= 1.8;	
@@ -397,23 +403,41 @@ void collision_check_bugs(Frog *froggy, Bug *bug) {
 				}
 			}	
 
-			// TODO: froggy shouldn't lose hp on succesful jump kill
-			// otherwise allow the frog to bounce off bug for a boost and kill the bug						
-			if (froggy->status == ALIVE && bug->status == ALIVE) {			
+			// bump froggy down when trying to jump through a bug
+			froggy->velocity.y = 0.25 * FROGGY_BUMP_VELOCITY_Y;
+
+			// TODO: get horizontal bump to work
+			// froggy is further left than bug
+			if (froggy->position.x < bug->position.x) {
+				froggy->velocity.x = -FROGGY_BUMP_VELOCITY_X;
+			} 
+
+			// froggy is further right
+			if (froggy->position.x > bug->position.x) {
+				froggy->velocity.x = FROGGY_BUMP_VELOCITY_X;
+			} 
+
+		// froggy is on TOP wew!!!!	
+		} else if (froggy->position.y < bug->position.y && froggy->isJumping) {
+			// allow the frog to bounce off bug for a boost and kill the bug						
+			if (bug->status == ALIVE) {			
 				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
 				bug->status = DEAD;	
 				froggy->score++;		
 			}
-		}		
+		} 
+	}	
+}
 
-		// frog dies when health goes to 0 . . . .
-		if (froggy->health <= 0) {
-			froggy->health = 0;
-			froggy->status = DEAD;	
-			froggy->frame = 5;		
-		}
+void froggy_death(Frog *froggy) {
+	// frog dies when health goes to 0 . . . .	
+	if (froggy->health <= 0) {
+		froggy->health = 0;
+		froggy->status = DEAD;	
+		froggy->frame = 5;		
 	}
 }
+
 
 
 // collision
@@ -693,7 +717,8 @@ int main () {
 			}
 			nextLilypadSpawn -= 400.0f;
 		}	
-				
+		
+		froggy_death(&froggy);
 		screen_flip(&froggy);
 		apply_gravity(&froggy);
 		move_frog(&froggy, maxFrames, deltaTime);		
