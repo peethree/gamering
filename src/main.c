@@ -1,29 +1,10 @@
 #include "raylib.h"
+#include "constants.h"
 #include <math.h>
-
 #include "resource_dir.h"	
 
-#define MAX_MOSQUITOES 100
-#define MOSQUITO_SPAWN_INTERVAL 0.5f
-
-#define MAX_WASPS 10
-#define WASP_SPAWN_INTERVAL 5.0f
-
-#define MAX_LILLYPADS 1000
-#define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
-
-#define FROGGY_HEALTH 100.0
-#define FROGGY_VELOCITY_X 200.0
-#define FROGGY_JUMP_VELOCITY_Y 1100.0
-#define FROGGY_JUMP_VELOCITY_X 380.0
-#define FROGGY_BUMP_VELOCITY_Y 825
-#define FROGGY_BUMP_VELOCITY_X 380.0
-#define FROGGY_FALL_VELOCITY 450.0
-#define FROGGY_TONGUE_LENGTH 380.0f 
-#define FROGGY_ATTACK_DURATION 0.4f
-#define FROGGY_TONGUE_WIDTH 5.0f
-
 // TODO: 
+// consider putting big jump on a timer now that there's a small jump
 // make a cool wasp Sprite
 // keep track of highscore 
 // add some kind of menu when the game is over
@@ -35,8 +16,6 @@
 // fix successfully jumping on mosquitoes taking away health
 
 // multiplayer?
-
-
 
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
@@ -51,7 +30,6 @@ typedef enum Status{
 	DEAD = -1,
 } Status;
 
-// struct for frog sprite
 typedef struct Frog{
 	Texture2D texture;		
 	Rectangle position;
@@ -75,7 +53,6 @@ typedef struct Frog{
 	int score;
 } Frog;
 
-// struct for killer bugs
 typedef struct Bug{	
 	Texture2D texture;
 	Rectangle position;
@@ -87,21 +64,18 @@ typedef struct Bug{
 	Vector2 targetPosition;
 	Vector2 desiredVelocity;
 	Rectangle previousPosition;
-	bool isActive;
-	// heatseeking movement
+	bool isActive;	
 	float angle;
 	float radius;
 	float spiralSpeed;
 	float convergence;	
 	float minRadius; 
-	// wave movement
 	Vector2 spawnPosition;
 	float waveFrequency;
 	float waveAmplitude;
 	char* type;			
 } Bug;
 
-// platforms to jump on for the frog
 typedef struct Lilypad{
 	Texture2D texture;
 	Rectangle position;
@@ -118,6 +92,54 @@ void apply_gravity(Frog *froggy) {
 		froggy->velocity.y = FROGGY_FALL_VELOCITY;
 	}
 }
+
+void jump_animation(Frog *froggy, int maxFrames, float deltaTime, float frameDuration) {
+	if (froggy->isJumping) {			
+		froggy->frameTimer += deltaTime;
+		
+		if (froggy->frameTimer >= frameDuration) {
+			froggy->frameTimer = 0.0f;
+			froggy->frame++;
+			// cycling frames, result being jump animation
+			froggy->frame %= maxFrames; 
+		}	
+	}
+
+	// countdown jumptimer to 0
+	froggy->jumpTimer -= deltaTime;
+
+	if (froggy->jumpTimer <= 0.0f) {
+		froggy->jumpTimer = 0.0f; 
+
+		// reset jump status
+		froggy->isJumping = false;
+
+		// resting frog texture
+		froggy->frame = 0;       
+	}
+}
+
+void baby_jump(Frog *froggy, int maxFrames, float deltaTime) {
+
+	// TODO: don't quite like the look of this animation
+	const float frameDuration = 0.10f;  
+	const float jumpDuration = 1.1f; 
+
+	// froggy->velocity.x = 0.0;
+	if (froggy->status == ALIVE) {
+		if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
+			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.7;		
+			froggy->isJumping = true;
+			froggy->jumpTimer = jumpDuration;			
+
+			// start at second/third frame for more believable jump animation
+			froggy->frame = 2;          
+			froggy->frameTimer = 0.0f;  
+			jump_animation(froggy, maxFrames, deltaTime, frameDuration);
+		}	
+	}			
+}
+
 
 // movement	frog
 void move_frog(Frog *froggy, int maxFrames, float deltaTime) {
@@ -149,7 +171,7 @@ void move_frog(Frog *froggy, int maxFrames, float deltaTime) {
 		}
 
 		// jump (prevent double jumps) TODO: fix mid air jump
-		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
+		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;			
@@ -157,30 +179,9 @@ void move_frog(Frog *froggy, int maxFrames, float deltaTime) {
 			// start at second/third frame for more believable jump animation
 			froggy->frame = 2;          
 			froggy->frameTimer = 0.0f;  
-		}
-		
-		if (froggy->isJumping) {			
-			froggy->frameTimer += deltaTime;
 			
-			if (froggy->frameTimer >= frameDuration) {
-				froggy->frameTimer = 0.0f;
-				froggy->frame++;
-				// cycling frames, result being jump animation
-				froggy->frame %= maxFrames; 
-			}
-			
-			// countdown jumptimer to 0
-			froggy->jumpTimer -= deltaTime;
-			if (froggy->jumpTimer <= 0.0f) {
-				froggy->jumpTimer = 0.0f; 
-
-				// reset jump status
-				froggy->isJumping = false;
-
-				// resting frog texture
-				froggy->frame = 0;       
-			}
-		}
+		}	
+		jump_animation(froggy, maxFrames, deltaTime, frameDuration);		
 	}
 }	
 
@@ -273,16 +274,19 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
             tongueEndY - halfWidth * cosf(angle)
         };
         
+		// taper hitbox near the end of its length
+		// 
+		float currentHitboxWidth = FROGGY_TONGUE_WIDTH * (1.0f - (currentLength / FROGGY_TONGUE_LENGTH) * 0.5f); 
         // ceate hitbox as a rectangle that encompasses the rotated tongue
-		// TODO: inaccurate. look for solution
         froggy->tongueHitbox = (Rectangle){
             fminf(topLeft.x, bottomRight.x),
             fminf(topLeft.y, bottomRight.y),
             fabsf(tongueEndX - frogMouthPosition.x) + halfWidth,
-            fabsf(tongueEndY - frogMouthPosition.y) + halfWidth
+            currentHitboxWidth
         };
 
         // reset hitbox when attack is over.
+		// was killing bugs at 0,0 coords before when initialized at those coords 
         if (froggy->tongueTimer >= froggy->attackDuration) {
             froggy->isAttacking = false;
             froggy->tongue = (Rectangle){800, 1280, 0, 0};
@@ -313,9 +317,9 @@ void draw_tongue(Frog *froggy) {
 void move_mosquito(Bug *mosquito, float deltaTime) {	
 	
 	if (mosquito->status == ALIVE) {
-		mosquito->waveAmplitude = 60.0f;
-		mosquito->waveFrequency = 5.5f;
-		mosquito->velocity.x = 360.0f;
+		mosquito->waveAmplitude = MOSQUITO_WAVE_AMPLITUDE; 
+		mosquito->waveFrequency = MOSQUITO_WAVE_FREQUENCY; 
+		mosquito->velocity.x = MOSQUITO_VELOCITY_X; 
 		mosquito->angle += deltaTime;	
 
 		// update position
@@ -323,7 +327,7 @@ void move_mosquito(Bug *mosquito, float deltaTime) {
 		mosquito->position.y = mosquito->spawnPosition.y + mosquito->waveAmplitude * sinf(mosquito->waveFrequency * mosquito->angle);
 	} else {
 		// bug should fall off the screen	
-		mosquito->velocity.y = 300.0;
+		mosquito->velocity.y = MOSQUITO_VELOCITY_DEATH_FALL; 
 		mosquito->position.y += mosquito->velocity.y * deltaTime;	
 	}
 }
@@ -379,7 +383,7 @@ void move_wasp(Bug *wasp, Frog *froggy, float deltaTime) {
 
 	// dead bug should fall off the screen
 	if (wasp->status == DEAD) {
-		wasp->velocity.y = 300.0;
+		wasp->velocity.y = WASP_VELOCITY_DEATH_FALL; 
 		wasp->position.y += wasp->velocity.y * deltaTime;
 	}
 }
@@ -544,8 +548,8 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 			// smoother transition						
 			froggy->position.y += (pad->position.y - froggy->position.y) * 0.9f;	
 			
-			// froggy is not moving up or down vertically (affected by gravity --> velocity.y 450.0)
-			if (froggy->velocity.y == 450.0) {
+			// froggy is not moving up or down vertically (or affected by max gravity)
+			if (froggy->velocity.y == FROGGY_FALL_VELOCITY) {
 				froggy->frame = 1;
 				froggy->isJumping = false;	
 			}
@@ -700,11 +704,9 @@ int main () {
 	int activeMosquitoes = 0;	
 	int activeWasps = 0;	
 
-
 	// bug spawntimer
-	float mosquitoSpawnTimer = 0.0f;		
-	float waspSpawnTimer = 5.0f;
-	
+	float mosquitoSpawnTimer = MOSQUITO_SPAWN_TIMER;		
+	float waspSpawnTimer = WASP_SPAWN_TIMER;	
 
 	// lilipad init
 	Texture2D lilypad_texture = LoadTexture("lilipads.png");
@@ -721,7 +723,6 @@ int main () {
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
-
 		// updates
 		float deltaTime = GetFrameTime();
 
@@ -764,6 +765,7 @@ int main () {
 		froggy_death(&froggy);
 		screen_flip(&froggy);
 		apply_gravity(&froggy);
+		baby_jump(&froggy, maxFrames, deltaTime);
 		move_frog(&froggy, maxFrames, deltaTime);		
 		frog_attack(&froggy, deltaTime, camera);	
 		apply_velocity(&froggy, deltaTime);	
@@ -825,7 +827,7 @@ int main () {
 		camera.target.y = camera.target.y + (froggy.position.y - camera.target.y) * 0.1f;
 
 		// prevent camera from going below ground:
-		float minY = GetScreenHeight()/2.0f;
+		float minY = GetScreenHeight() / 2.0f;
 		if (camera.target.y > minY) {
 			camera.target.y = minY;
 		}
