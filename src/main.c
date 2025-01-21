@@ -19,7 +19,7 @@
 #define FROGGY_BUMP_VELOCITY_Y 825
 #define FROGGY_BUMP_VELOCITY_X 380.0
 #define FROGGY_FALL_VELOCITY 450.0
-#define FROGGY_TONGUE_LENGTH 350.0f
+#define FROGGY_TONGUE_LENGTH 380.0f 
 #define FROGGY_ATTACK_DURATION 0.4f
 #define FROGGY_TONGUE_WIDTH 5.0f
 
@@ -63,6 +63,7 @@ typedef struct Frog{
 	bool isAttacking;
     float tongueTimer;
     float attackDuration;
+	float tongueAngle;
 	float health;
 	Status status;	
 	bool isJumping; 
@@ -196,8 +197,7 @@ void screen_flip(Frog *froggy) {
 	}
 }
  
-void frog_attack(Frog *froggy, float deltaTime) {
-	
+void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {	
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && froggy->status == ALIVE) {
         froggy->isAttacking = true;
         froggy->tongueTimer = 0.0f;
@@ -221,39 +221,91 @@ void frog_attack(Frog *froggy, float deltaTime) {
         // tongue length calculation
         float currentLength = FROGGY_TONGUE_LENGTH * progress;
 
-        // tongue position is based on froggy direction
-		// facing right
-        if (froggy->direction == RIGHT) {
-            froggy->tongue = (Rectangle){
-                froggy->position.x + 45.0f,  
-                froggy->position.y + 10.0f,  
-                currentLength,
-                FROGGY_TONGUE_WIDTH
-            };
-		// facing left
-        } else {
-            froggy->tongue = (Rectangle){
-                froggy->position.x - currentLength + 15.0f,  
-                froggy->position.y + 10.0f,
-                currentLength,
-                FROGGY_TONGUE_WIDTH
-            };
-        }
+		// keep track of cursor coordinates, translate them into camera coords for hitbox logic
+        Vector2 cursorPosition = GetMousePosition();
+		Vector2 cameraMousePosition = GetScreenToWorld2D(cursorPosition, camera);
 
-        froggy->tongueHitbox = froggy->tongue;
+		// keep track of where on the sprite the tongue should appear from
+		Vector2 frogMouthPosition;
+		if (froggy->direction == RIGHT) {
+			frogMouthPosition.x = froggy->position.x + 45.0f;
+			frogMouthPosition.y = froggy->position.y + 10.0f;
+		} else {
+			frogMouthPosition.x = froggy->position.x + 15.0f;
+			frogMouthPosition.y = froggy->position.y + 10.0f;				
+		}
 
-        // reset hitbox when attack is over
+        // directional vectors
+        float dx = cameraMousePosition.x - frogMouthPosition.x;
+        float dy = cameraMousePosition.y - frogMouthPosition.y;
+        
+        // angle
+        float angle = atan2f(dy, dx);
+        
+        // tongue endpoint
+        float tongueEndX = frogMouthPosition.x + cosf(angle) * currentLength;
+        float tongueEndY = frogMouthPosition.y + sinf(angle) * currentLength;
+        
+        // turn frog in direction of the mouseclick 
+        froggy->direction = (cameraMousePosition.x > frogMouthPosition.x) ? RIGHT : LEFT;
+        
+		// tongue rectangle
+        froggy->tongue = (Rectangle){
+            frogMouthPosition.x,
+            frogMouthPosition.y,
+            currentLength,
+            FROGGY_TONGUE_WIDTH
+        };
+        
+        // angle needed for drawing
+        froggy->tongueAngle = angle * RAD2DEG;  
+        
+		
+        float halfWidth = FROGGY_TONGUE_WIDTH / 2.0f;
+        
+        // hitbox corners
+        Vector2 topLeft = {
+            frogMouthPosition.x - halfWidth * sinf(angle),
+            frogMouthPosition.y + halfWidth * cosf(angle)
+        };        
+        Vector2 bottomRight = {
+            tongueEndX + halfWidth * sinf(angle),
+            tongueEndY - halfWidth * cosf(angle)
+        };
+        
+        // ceate hitbox as a rectangle that encompasses the rotated tongue
+		// TODO: inaccurate. look for solution
+        froggy->tongueHitbox = (Rectangle){
+            fminf(topLeft.x, bottomRight.x),
+            fminf(topLeft.y, bottomRight.y),
+            fabsf(tongueEndX - frogMouthPosition.x) + halfWidth,
+            fabsf(tongueEndY - frogMouthPosition.y) + halfWidth
+        };
+
+        // reset hitbox when attack is over.
         if (froggy->tongueTimer >= froggy->attackDuration) {
             froggy->isAttacking = false;
             froggy->tongue = (Rectangle){800, 1280, 0, 0};
             froggy->tongueHitbox = (Rectangle){800, 1280, 0, 0};
+            froggy->tongueAngle = 0.0f;
         }
     }
 }
 
 void draw_tongue(Frog *froggy) {
 	if (froggy->isAttacking) {
-        DrawRectangleRec(froggy->tongue, RED); 		
+        DrawRectanglePro(
+			froggy->tongue,
+			(Vector2){ 0, FROGGY_TONGUE_WIDTH },
+			froggy->tongueAngle,
+			RED
+		);
+		//    DrawRectanglePro(
+		// 	froggy->tongueHitbox,
+		// 	(Vector2){ 0, FROGGY_TONGUE_WIDTH },
+		// 	froggy->tongueAngle,
+		// 	WHITE
+		// );
 	}
 }
 
@@ -664,9 +716,7 @@ int main () {
 	// 4 frames in lilypad sprite sheet
 	const float frameWidthLilypad = (float)(lilypad_texture.width / 4);	
 	
-	float nextLilypadSpawn = 0.0f;
-
-	
+	float nextLilypadSpawn = 0.0f;	
 
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
@@ -715,7 +765,7 @@ int main () {
 		screen_flip(&froggy);
 		apply_gravity(&froggy);
 		move_frog(&froggy, maxFrames, deltaTime);		
-		frog_attack(&froggy, deltaTime);	
+		frog_attack(&froggy, deltaTime, camera);	
 		apply_velocity(&froggy, deltaTime);	
 
 		// update lillypads
@@ -851,7 +901,7 @@ int main () {
 				0.0f,
 				(mosquitoes[i].status == ALIVE) ? RAYWHITE : RED);		
 
-			// DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 
+			DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 
 			// DrawText(TextFormat("spawn Position y: %.2f", mosquitoes[i].spawnPosition.y), 10, 310 + 20 * i, 20, WHITE);	
 			// DrawText(TextFormat("spawn Position x: %.2f", mosquitoes[i].spawnPosition.x), 10, 330 + 20 * i, 20, WHITE);				
 		}
