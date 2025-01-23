@@ -324,6 +324,7 @@ void move_mosquito(Bug *mosquito, float deltaTime) {
 		mosquito->position.y = mosquito->spawnPosition.y + mosquito->waveAmplitude * sinf(mosquito->waveFrequency * mosquito->angle);
 	// don't update position anymore in this func when bug is eaten
 	} else if (mosquito->isEaten) {
+		//
 	// bug should fall off the screen in case of jump death
 	} else {			
 		mosquito->velocity.y = MOSQUITO_VELOCITY_DEATH_FALL; 
@@ -378,7 +379,14 @@ void move_wasp(Bug *wasp, Frog *froggy, float deltaTime) {
 		} else {
 			wasp->frame = 0;
 		}
-	}
+
+	} else if (wasp->isEaten) {
+		//
+	// bug should fall off the screen in case of jump death
+	} else {			
+		wasp->velocity.y = WASP_VELOCITY_DEATH_FALL; 
+		wasp->position.y += wasp->velocity.y * deltaTime;	
+	}	
 }
 
 // velocity frog
@@ -435,6 +443,7 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
 		}	
 
 		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox)) {
+			froggy->size += 1.01;
 			bug->isActive = false;
 		}	
     }
@@ -512,6 +521,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 			if (bug->status == ALIVE) {			
 				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
 				bug->status = DEAD;	
+				// TODO: fix this
 				bug_jump_death(bug, deltaTime);
 				froggy->score++;		
 			}
@@ -714,7 +724,8 @@ int main () {
 		.isBouncing = false,
 		.tongue = (Rectangle){800, 1280, 0, 0},
 		.tongueHitbox = (Rectangle){800, 1280, 0, 0},
-		.attackDuration = FROGGY_ATTACK_DURATION
+		.attackDuration = FROGGY_ATTACK_DURATION,
+		.size = 1.0
 	};		
 
 	// 8 pictures on the frog sprite sheet -> 
@@ -841,7 +852,7 @@ int main () {
 		for (int i = 0; i < activeWasps; i++) {
 			move_wasp(&wasps[i], &froggy, deltaTime);
 			collision_check_bugs(&froggy, &wasps[i], deltaTime);
-			eat_bug(&froggy, &mosquitoes[i], deltaTime);
+			eat_bug(&froggy, &wasps[i], deltaTime);
 			deactivate_bug(&wasps[i], &froggy);
 
 			if (wasps[i].isActive) {
@@ -914,12 +925,12 @@ int main () {
 				frameWidth * froggy.frame, 
 				0, 
 				// flip the texture horizontally depending on direction it's facing
-				(froggy.direction == RIGHT) ? -frameWidth : frameWidth,	
+				(froggy.direction == RIGHT) ? -frameWidth: frameWidth,	
 				// flip the texture vertically when the frog is dead			
 				froggy.texture.height * froggy.status}, 
 			(Vector2){froggy.position.x, froggy.position.y}, 
 			// change color based on whether alive or not
-			(froggy.status == ALIVE) ? RAYWHITE : RED);
+			(froggy.status == ALIVE) ? RAYWHITE : RED);		
 			 
 		draw_tongue(&froggy);
 
@@ -984,6 +995,7 @@ int main () {
 		DrawText(TextFormat("acive wasps: %d", activeWasps), 10, 310, 20, WHITE);
 		DrawText(TextFormat("tonguetimer: %.2f", froggy.tongueTimer), 10, 340, 20, WHITE);
 		DrawText(TextFormat("attackduration: %.2f", froggy.attackDuration), 10, 370, 20, WHITE);
+		DrawText(TextFormat("size: %.2f", froggy.size), 10, 400, 20, WHITE);
 		
 		if (froggy.status == DEAD) {
 			DrawText("FROGGY HAS PERISHED", 400, 400, 42, RED);
