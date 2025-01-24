@@ -225,12 +225,12 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
 
 		// keep track of where on the sprite the tongue should appear from
 		Vector2 frogMouthPosition;
-		if (froggy->direction == RIGHT) {
-			frogMouthPosition.x = froggy->position.x + 45.0f;
-			frogMouthPosition.y = froggy->position.y + 10.0f;
+		if (froggy->direction == RIGHT) {				//offsets to spawn tongue closer to mouth
+			frogMouthPosition.x = froggy->position.x + (7.0f * froggy->size * 1.9);
+			frogMouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9);
 		} else {
-			frogMouthPosition.x = froggy->position.x + 15.0f;
-			frogMouthPosition.y = froggy->position.y + 10.0f;				
+			frogMouthPosition.x = froggy->position.x - (7.0f * froggy->size * 1.9);
+			frogMouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9);				
 		}
 
         // direction vectors
@@ -258,7 +258,8 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
         // angle needed for drawing
         froggy->tongueAngle = angle * RAD2DEG;          
 		
-        float halfWidth = FROGGY_TONGUE_WIDTH / 2.0f;
+        float tongueWidth = FROGGY_TONGUE_WIDTH * froggy->size;
+		float halfWidth = tongueWidth / 2.0f;
         
         // hitbox corners
         Vector2 topLeft = {
@@ -272,7 +273,7 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
         
 		// taper hitbox near the end of its length
 		// 
-		float currentHitboxWidth = FROGGY_TONGUE_WIDTH * (1.0f - (currentLength / FROGGY_TONGUE_LENGTH) * 0.5f); 
+		float currentHitboxWidth = tongueWidth * (1.0f - (currentLength / (FROGGY_TONGUE_LENGTH)) * 0.5f); 
         // ceate hitbox as a rectangle that encompasses the rotated tongue
         froggy->tongueHitbox = (Rectangle){
             fminf(topLeft.x, bottomRight.x),
@@ -286,8 +287,8 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
 		// might not be necessary ?
         if (froggy->tongueTimer >= froggy->attackDuration) {
             froggy->isAttacking = false;
-            froggy->tongue = (Rectangle){800, 1280, 0, 0};
-            froggy->tongueHitbox = (Rectangle){800, 1280, 0, 0};
+            froggy->tongue = (Rectangle){ 800, 1280, 0, 0 };
+            froggy->tongueHitbox = (Rectangle){ 800, 1280, 0, 0 };
             froggy->tongueAngle = 0.0f;
         }
     }
@@ -295,12 +296,14 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
 
 void draw_tongue(Frog *froggy) {
 	if (froggy->isAttacking) {
+
         DrawRectanglePro(
 			froggy->tongue,
-			(Vector2){ 0, FROGGY_TONGUE_WIDTH },
+			(Vector2){0, FROGGY_TONGUE_WIDTH / 2},		
 			froggy->tongueAngle,
 			RED
 		);
+		
 		//    DrawRectanglePro(
 		// 	froggy->tongueHitbox,
 		// 	(Vector2){ 0, FROGGY_TONGUE_WIDTH },
@@ -443,7 +446,7 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
 		}	
 
 		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox)) {
-			froggy->size += 1.01;
+			froggy->size += 0.25;
 			bug->isActive = false;
 		}	
     }
@@ -488,7 +491,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 	}	
 	
 	// froggy bug collision
-	if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) && bug->status == ALIVE) {
+	if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) && bug->status == ALIVE && froggy->status == ALIVE) {
 		// froggy is hitting the bug from the bottom
 		if (froggy->position.y > bug->position.y) {		
 			if (froggy->health >= 0.0) {
@@ -919,7 +922,7 @@ int main () {
 		}
 				
 		// draw frog
-		DrawTextureRec(
+		DrawTexturePro(
 			froggy.texture, 
 			(Rectangle){
 				frameWidth * froggy.frame, 
@@ -927,12 +930,37 @@ int main () {
 				// flip the texture horizontally depending on direction it's facing
 				(froggy.direction == RIGHT) ? -frameWidth: frameWidth,	
 				// flip the texture vertically when the frog is dead			
-				froggy.texture.height * froggy.status}, 
-			(Vector2){froggy.position.x, froggy.position.y}, 
-			// change color based on whether alive or not
-			(froggy.status == ALIVE) ? RAYWHITE : RED);		
+				froggy.texture.height * froggy.status }, 
+			(Rectangle){
+				froggy.position.x,
+				froggy.position.y,
+				frameWidth * froggy.size,					
+				(float)froggy.texture.height * froggy.size },
+			  (Vector2){ 
+				frameWidth * froggy.size / 2, 
+				(float)froggy.texture.height * froggy.size / 2 
+   			}, 
+			0,
+			(froggy.status == ALIVE) ? RAYWHITE : RED);
+	
+
+			
+		// DrawTextureRec(
+		// 	froggy.texture, 
+		// 	(Rectangle){
+		// 		frameWidth * froggy.frame, 
+		// 		0, 
+		// 		// flip the texture horizontally depending on direction it's facing
+		// 		(froggy.direction == RIGHT) ? -frameWidth: frameWidth,	
+		// 		// flip the texture vertically when the frog is dead			
+		// 		froggy.texture.height * froggy.status}, 
+		// 	(Vector2){froggy.position.x, froggy.position.y}, 
+		// 	// change color based on whether alive or not
+		// 	(froggy.status == ALIVE) ? RAYWHITE : RED);				
 			 
 		draw_tongue(&froggy);
+
+
 
 		// draw the bugs
 		for (int i = 0; i < activeMosquitoes; i++) {									
@@ -950,7 +978,7 @@ int main () {
 					mosquitoes[i].position.y,
 					frameWidthBug * GetRandomValue(9,10) / 10.0,					
 					(float)mosquitoes[i].texture.height * GetRandomValue(9,10) / 10.0},
-				(Vector2){0,0},
+				(Vector2){ 0, 0 },
 				0.0f,
 				(mosquitoes[i].status == ALIVE) ? RAYWHITE : RED);		
 
