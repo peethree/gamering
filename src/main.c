@@ -3,7 +3,6 @@
 #include <math.h>
 #include "resource_dir.h"	
 #include <stdio.h> 
-#include <stdlib.h> 
 
 // TODO: 
 // consider putting big jump on a timer now that there's a small jump
@@ -704,18 +703,18 @@ void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
 int get_highscore() {    
     int highscore = 0;
 
-    // file does not exist, make it
+    // file doesn't exist, make it
     if (!FileExists("highscore.txt")) {        
-        FILE *file = fopen("highscore.txt", "wb");
+        FILE *file = fopen("highscore.txt", "w");
         if (file) {
-            fwrite(&highscore, sizeof(int), 1, file); 
+            fprintf(file, "%d", highscore);
             fclose(file);
         } 
-	// file exists
+	// file exists, read highscore
     } else {        
-        FILE *file = fopen("highscore.txt", "rb");
+        FILE *file = fopen("highscore.txt", "r");
         if (file) {
-            fread(&highscore, sizeof(int), 1, file);
+            fscanf(file, "%d", &highscore);
             fclose(file);
         } 
     }
@@ -724,15 +723,14 @@ int get_highscore() {
 }
 
 void update_highscore(Frog *froggy, int highscore) {
-	// if current_score > highscore
-	if (froggy->score > highscore) {
-		FILE *file = fopen("highscore.txt", "wb");
-		if (file) {
-			// write binary score integer
-			fwrite(&froggy->score, sizeof(int), 1, file);
-			fclose(file);
-		}	
-	}
+    // current_score > highscore
+    if (froggy->score > highscore) {
+        FILE *file = fopen("highscore.txt", "w");
+        if (file) {
+            fprintf(file, "%d", froggy->score); 
+            fclose(file);
+        }    
+    }
 }
 
 int main () {	
@@ -871,8 +869,6 @@ int main () {
         if (froggy.score > highscore) {
             highscore = froggy.score;
         }
-		// as well as on disk
-		update_highscore(&froggy, highscore);
 
 		// update lillypads
 		int activePadsAfterLoop = 0;		
@@ -1085,6 +1081,10 @@ int main () {
 		// end the frame and get ready for the next one (display frame, poll input, etc...)
 		EndDrawing();		
 	}
+
+	// update highscore
+	highscore = get_highscore();
+	update_highscore(&froggy, highscore);
 
 	// cleanup
 	// unload our textures so it can be cleaned up
