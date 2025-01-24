@@ -5,10 +5,10 @@
 #include <stdio.h> 
 
 // TODO: 
+// fix spazzing out based on faced direction
 // consider putting big jump on a timer now that there's a small jump
 // slowdown tongue attack ?
 // make a cool wasp Sprite
-// keep track of highscore 
 // add some kind of menu when the game is over
 // add more bug movement patterns
 // add proximity based bug buzzing
@@ -164,8 +164,6 @@ void frog_big_jump(Frog *froggy, int maxFrames, float deltaTime) {
 	jump_animation(froggy, maxFrames, deltaTime, frameDuration);		
 }
 
-
-
 // movement	frog
 void move_frog(Frog *froggy) { 
 
@@ -252,9 +250,10 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
         float tongueEndX = frogMouthPosition.x + cosf(angle) * currentLength;
         float tongueEndY = frogMouthPosition.y + sinf(angle) * currentLength;
         
-        // turn frog in direction of the mouseclick 
-        froggy->direction = (cameraMousePosition.x > frogMouthPosition.x) ? RIGHT : LEFT;
-        
+        // turn frog in direction of the mouseclick, added deadzone		
+        froggy->direction = (cameraMousePosition.x < frogMouthPosition.x + 10.0f) ? LEFT : RIGHT;
+		
+
 		// tongue rectangle
         froggy->tongue = (Rectangle){
             frogMouthPosition.x,
@@ -434,7 +433,7 @@ void deactivate_bug(Bug *bug, Frog *froggy) {
 // you will eat the bugs
 void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
     // start pulling the bug toward the froggy when the tongue starts retracting
-    if (bug->isEaten && froggy->tongueTimer >= 0.5 * FROGGY_TONGUE_TIMER) {      
+    if (froggy->status == ALIVE && bug->isEaten && froggy->tongueTimer >= 0.5 * FROGGY_TONGUE_TIMER) {      
 		
         // direction vector        
         float dx = froggy->position.x - bug->position.x;
