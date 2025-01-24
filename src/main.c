@@ -2,9 +2,12 @@
 #include "constants.h"
 #include <math.h>
 #include "resource_dir.h"	
+#include <stdio.h> 
+#include <stdlib.h> 
 
 // TODO: 
 // consider putting big jump on a timer now that there's a small jump
+// slowdown tongue attack ?
 // make a cool wasp Sprite
 // keep track of highscore 
 // add some kind of menu when the game is over
@@ -88,7 +91,6 @@ typedef struct Lilypad{
 // gravity frog
 void apply_gravity(Frog *froggy) {
 	froggy->velocity.y += 36.0;
-
 	if (froggy->velocity.y > FROGGY_FALL_VELOCITY) {
 		froggy->velocity.y = FROGGY_FALL_VELOCITY;
 	}
@@ -121,7 +123,7 @@ void jump_animation(Frog *froggy, int maxFrames, float deltaTime, float frameDur
 }
 
 // smaller jump
-void baby_jump(Frog *froggy, int maxFrames, float deltaTime) {
+void frog_baby_jump(Frog *froggy, int maxFrames, float deltaTime) {
 
 	// TODO: don't quite like the look of this animation
 	const float frameDuration = 0.10f;  
@@ -142,11 +144,31 @@ void baby_jump(Frog *froggy, int maxFrames, float deltaTime) {
 	}			
 }
 
-// movement	frog
-void move_frog(Frog *froggy, int maxFrames, float deltaTime) {
-
+void frog_big_jump(Frog *froggy, int maxFrames, float deltaTime) {
 	const float frameDuration = 0.25f;  
-	const float jumpDuration = 1.4f;   
+	const float jumpDuration = 1.4f;  
+
+	if (froggy->status == ALIVE) {
+		// jump (prevent double jumps) TODO: fix mid air jump
+		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {
+			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
+			froggy->isJumping = true;
+			froggy->jumpTimer = jumpDuration;			
+
+			// start at second/third frame for more believable jump animation
+			froggy->frame = 2;          
+			froggy->frameTimer = 0.0f;  
+			
+		}	
+	}
+
+	jump_animation(froggy, maxFrames, deltaTime, frameDuration);		
+}
+
+
+
+// movement	frog
+void move_frog(Frog *froggy) { 
 
 	froggy->velocity.x = 0.0;
 
@@ -170,19 +192,6 @@ void move_frog(Frog *froggy, int maxFrames, float deltaTime) {
 			}				
 			froggy->direction = LEFT;
 		}
-
-		// jump (prevent double jumps) TODO: fix mid air jump
-		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {
-			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
-			froggy->isJumping = true;
-			froggy->jumpTimer = jumpDuration;			
-
-			// start at second/third frame for more believable jump animation
-			froggy->frame = 2;          
-			froggy->frameTimer = 0.0f;  
-			
-		}	
-		jump_animation(froggy, maxFrames, deltaTime, frameDuration);		
 	}
 }	
 
@@ -197,7 +206,7 @@ void screen_flip(Frog *froggy) {
 }
  
 void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {	
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && froggy->status == ALIVE) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking) {
         froggy->isAttacking = true;
         froggy->tongueTimer = 0.0f;        
     }
@@ -412,16 +421,16 @@ void deactivate_bug(Bug *bug, Frog *froggy) {
 }
 
 // helper function for bug death animation after getting jumped on
-void bug_jump_death(Bug *bug, float deltaTime) {
-	if (bug->status == DEAD) {
-		if (bug->type == "wasp") {
-			bug->velocity.y = WASP_VELOCITY_DEATH_FALL; 
-		} else if (bug->type == "mosquito") {
-			bug->velocity.y = MOSQUITO_VELOCITY_DEATH_FALL; 
-		}		
-		bug->position.y += bug->velocity.y * deltaTime;
-	}
-}
+// void bug_jump_death(Bug *bug, float deltaTime) {
+// 	if (bug->status == DEAD) {
+// 		if (bug->type == "wasp") {
+// 			bug->velocity.y = WASP_VELOCITY_DEATH_FALL; 
+// 		} else if (bug->type == "mosquito") {
+// 			bug->velocity.y = MOSQUITO_VELOCITY_DEATH_FALL; 
+// 		}		
+// 		bug->position.y += bug->velocity.y * deltaTime;
+// 	}
+// }
 
 // you will eat the bugs
 void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
@@ -482,7 +491,6 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 		};
 		}
 
-
 	// when the tongue hits a bug, kill it, increment score
 	if (CheckCollisionRecs(froggy->tongueHitbox, bug->hitbox)) {
 		bug->status = DEAD;
@@ -505,7 +513,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 
 			// bump froggy down when trying to jump through a bug
 			// TODO: instead of bump down, slow velocity
-			froggy->velocity.y = 0.10 * FROGGY_BUMP_VELOCITY_Y;
+			froggy->velocity.y *= 0.50;
 
 			// TODO: get horizontal bump to work // add a graceperiod so bug damage is more consistent
 			// froggy is further left than bug
@@ -519,13 +527,13 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 			} 
 
 		// froggy is on TOP wew!!!!	
-		} else if (froggy->position.y < bug->position.y && froggy->isJumping) {
+		} else if (froggy->position.y < bug->position.y && (froggy->isJumping || froggy->velocity.y <= FROGGY_FALL_VELOCITY)) {
 			// allow the frog to bounce off bug for a boost and kill the bug						
 			if (bug->status == ALIVE) {			
-				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.75;	
+				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.65;	
 				bug->status = DEAD;	
 				// TODO: fix this
-				bug_jump_death(bug, deltaTime);
+				// bug_jump_death(bug, deltaTime);
 				froggy->score++;		
 			}
 		} 
@@ -535,6 +543,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 void froggy_death(Frog *froggy) {
 	// frog dies when health goes to 0 . . . .	
 	if (froggy->health <= 0) {
+		froggy->velocity.x = 0;
 		froggy->health = 0;
 		froggy->status = DEAD;	
 		froggy->frame = 5;		
@@ -596,7 +605,7 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 			froggy->position.y += (pad->position.y - froggy->position.y) * 0.9f;	
 			
 			// froggy is not moving up or down vertically (or affected by max gravity)
-			if (froggy->velocity.y == FROGGY_FALL_VELOCITY) {
+			if (froggy->velocity.y == FROGGY_FALL_VELOCITY && froggy->status == ALIVE) {
 				froggy->frame = 1;
 				froggy->isJumping = false;	
 			}
@@ -680,8 +689,6 @@ void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *frog
 	pad->isActive = true;
 }
 
-
-
 void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
 	// get the highest y value visited
 	if (froggy->position.y < froggy->highestPosition) {
@@ -694,6 +701,40 @@ void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
     }
 }
 
+int get_highscore() {    
+    int highscore = 0;
+
+    // file does not exist, make it
+    if (!FileExists("highscore.txt")) {        
+        FILE *file = fopen("highscore.txt", "wb");
+        if (file) {
+            fwrite(&highscore, sizeof(int), 1, file); 
+            fclose(file);
+        } 
+	// file exists
+    } else {        
+        FILE *file = fopen("highscore.txt", "rb");
+        if (file) {
+            fread(&highscore, sizeof(int), 1, file);
+            fclose(file);
+        } 
+    }
+
+    return highscore;
+}
+
+void update_highscore(Frog *froggy, int highscore) {
+	// if current_score > highscore
+	if (froggy->score > highscore) {
+		FILE *file = fopen("highscore.txt", "wb");
+		if (file) {
+			// write binary score integer
+			fwrite(&froggy->score, sizeof(int), 1, file);
+			fclose(file);
+		}	
+	}
+}
+
 int main () {	
 	// Tell the window to use vsync and work on high DPI displays
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
@@ -704,6 +745,8 @@ int main () {
 
 	// Utility function from resource_dir.h to find the resources folder and set it as the current working directory so we can load from it
 	SearchAndSetResourceDir("resources");
+
+	int highscore = get_highscore();
 
 	Texture2D frog_texture = LoadTexture("frog.png");	
 
@@ -813,14 +856,23 @@ int main () {
 			nextLilypadSpawn -= 400.0f;
 		}	
 		
-		
-		froggy_death(&froggy);
+		if (froggy.status == ALIVE) {							
+			frog_baby_jump(&froggy, maxFrames, deltaTime);
+			frog_big_jump(&froggy, maxFrames, deltaTime);
+			move_frog(&froggy);				
+			frog_attack(&froggy, deltaTime, camera);			
+		}
 		screen_flip(&froggy);
-		apply_gravity(&froggy);
-		baby_jump(&froggy, maxFrames, deltaTime);
-		move_frog(&froggy, maxFrames, deltaTime);				
-		frog_attack(&froggy, deltaTime, camera);	
 		apply_velocity(&froggy, deltaTime);	
+		apply_gravity(&froggy);
+		froggy_death(&froggy);
+		
+		// update highscore in current game
+        if (froggy.score > highscore) {
+            highscore = froggy.score;
+        }
+		// as well as on disk
+		update_highscore(&froggy, highscore);
 
 		// update lillypads
 		int activePadsAfterLoop = 0;		
@@ -1008,6 +1060,7 @@ int main () {
 		
 		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, WHITE);
 		DrawText(TextFormat("Score: %d", froggy.score), 500, 40, 40, WHITE);
+		DrawText(TextFormat("Highscore: %d", highscore), 500, 80, 40, WHITE);
 
 		// debug 
 		DrawText(TextFormat("Position: %.2f", froggy.position.y), 10, 10, 20, WHITE);
