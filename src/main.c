@@ -8,7 +8,7 @@
 // fix spazzing out based on faced direction
 // consider putting big jump on a timer now that there's a small jump
 // slowdown tongue attack ?
-// make a cool wasp Sprite
+
 // add some kind of menu when the game is over
 // add more bug movement patterns
 // add proximity based bug buzzing
@@ -27,10 +27,12 @@ typedef enum Direction {
 	RIGHT = 1,
 } Direction;
 
+
 typedef enum Status{
 	ALIVE = 1,
 	DEAD = -1,
 } Status;
+
 
 typedef struct Frog{
 	Texture2D texture;		
@@ -55,6 +57,7 @@ typedef struct Frog{
 	float size;
 	int score;
 } Frog;
+
 
 typedef struct Bug{	
 	Texture2D texture;
@@ -81,13 +84,28 @@ typedef struct Bug{
 	float frameTimer;		
 } Bug;
 
+
 typedef struct Lilypad{
 	Texture2D texture;
 	Rectangle position;
 	Rectangle hitbox;
 	int frame;
 	bool isActive;
+	bool hasFishtrap;
 } Lilypad;
+
+
+typedef struct Fish{
+	Texture2D texture;
+	Rectangle position;
+	Rectangle hitbox;
+	int frame;
+	bool isAttacking;
+	float attackDuration;
+	float frameTimer;
+	bool isActive;
+} Fish;
+
 
 // gravity frog
 void apply_gravity(Frog *froggy) {
@@ -357,7 +375,6 @@ void animate_wasp(Bug *wasp, float deltaTime, int maxFramesWasp) {
 		wasp->frame %= maxFramesWasp;
 	}
 }
-
 
 // TODO: maybe invert the spiral so the wasp doesn't auto kill itself
 // movement wasp
@@ -691,6 +708,7 @@ void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
 	};
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;	
+	pad->hasFishtrap = false;
 }
 
 void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
@@ -703,6 +721,7 @@ void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *frog
 	};	
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;
+	pad->hasFishtrap = false;
 }
 
 void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
@@ -716,6 +735,46 @@ void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
         pad->isActive = false;
     }
 }
+
+void animate_fish(Fish *fishy, float deltaTime, int maxFramesFish) {
+	// once fish is active, animate it (once).
+	// should b attacking 
+	if (fishy->isActive) {
+		float frameDuration = 0.2f;
+		fishy->frameTimer += deltaTime;
+
+		if (fishy->frameTimer >= frameDuration) {
+			fishy->frameTimer = 0.0f;
+			fishy->frame++;
+			fishy->frame %= maxFramesFish;
+		}	
+	}
+}
+
+// fish lays (swims) in ambush at location of the lilypads
+void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePads) {
+	// spawn when frog is near
+	// hitbox depends on the frame
+	// attack when frog is ontop of boobytrapped lilypad
+	fishy->texture = fish_texture;
+
+	// pick a random lilypad between 0 and the max active pads for a fish to spawn on
+	int randomValue = GetRandomValue(0, activePads - 1);	
+
+	// don't double spawn fish on lilypads
+	if (!pads[randomValue].hasFishtrap) {
+		fishy->position = pads[randomValue].position;	
+		fishy->isActive = true;
+	}
+
+}
+
+void activate_fish(Fish *fishy, Frog *froggy) {
+	if (fishy->isActive) {
+		// attack the frog when he's near
+	}
+}
+
 
 int get_highscore() {    
     int highscore = 0;
@@ -802,6 +861,7 @@ int main () {
 
 	Texture2D mosquito_texture = LoadTexture("bug.png");
 	Texture2D wasp_texture = LoadTexture("WASP.png");
+	Texture2D fish_texture = LoadTexture("fish.png");
 
 	// mosquito (only 2 frames for directions)
 	const float frameWidthBug = (float)(mosquito_texture.width / 2);
@@ -810,12 +870,18 @@ int main () {
 	const float frameWidthWasp = (float)(wasp_texture.width / 2);
 	const int maxFramesWasp = (int)(wasp_texture.width / frameWidthWasp);
 
-	// array of mosquitoes / wasps
+	// fish 8 frames 
+	const float frameWidthFish = (float)(fish_texture.width / 8);
+	const int maxFramesFish = (int)(fish_texture.width / frameWidthFish);
+
+	// array of mosquitoes / wasps / fish
 	Bug mosquitoes[MAX_MOSQUITOES];
 	Bug wasps[MAX_WASPS];
+	Fish fishies[MAX_FISH];
 
 	int activeMosquitoes = 0;	
 	int activeWasps = 0;	
+	int activeFish = 0;
 
 	// bug spawntimer
 	float mosquitoSpawnTimer = MOSQUITO_SPAWN_TIMER;		
@@ -865,6 +931,8 @@ int main () {
 			}
 		}
 
+
+
 		// TODO: this needs looked at still
 		// keep spawning lilypads, this time offscreen
 		if (froggy.position.y < nextLilypadSpawn) {
@@ -874,6 +942,14 @@ int main () {
 			}
 			nextLilypadSpawn -= 400.0f;
 		}	
+
+		// spawn fish
+		if (activeFish < MAX_FISH) {
+			for (int i = 0; i < MAX_FISH; i++) {
+				spawn_fish(&fishies[activeFish], fish_texture, pads, activePads);
+				activeFish++;
+			}
+		}
 		
 		if (froggy.status == ALIVE) {							
 			frog_baby_jump(&froggy, maxFrames, deltaTime);
@@ -934,6 +1010,17 @@ int main () {
 		}
 		activeWasps = activeWaspsAfterLoop;
 
+		// update fish
+		int activeFishAfterLoop = 0;
+		for (int i = 0; i < activeFish; i++) {
+			animate_fish(&fishies[i], deltaTime, maxFramesFish);
+
+			if (fishies[i].isActive) {
+				fishies[activeFishAfterLoop++] = fishies[i];
+			}	
+		}
+		activeFish = activeFishAfterLoop;
+
 		// if froggy below ground, put it back on ground
     	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
 			froggy.position.y = GetScreenHeight() - froggy.position.height;
@@ -961,10 +1048,6 @@ int main () {
 			
 		for (int i = 0; i < activePads; i++) {		
 			if (!pads[i].isActive) continue;
-			Vector2 lilypadPosition = {
-				(float)pads[i].position.x,
-				(float)pads[i].position.y
-			};
 
 			// draw lilypads
 			DrawTextureRec(
@@ -975,7 +1058,7 @@ int main () {
 					frameWidthLilypad,
 					pads[i].texture.height	
 				},
-				lilypadPosition,
+				(Vector2){ (float)pads[i].position.x,(float)pads[i].position.y},
 				RAYWHITE
 			);
 			
@@ -1011,26 +1094,24 @@ int main () {
 				(float)froggy.texture.height * froggy.size / 2 
    			}, 
 			0,
-			(froggy.status == ALIVE) ? RAYWHITE : RED);
-	
-
-			
-		// DrawTextureRec(
-		// 	froggy.texture, 
-		// 	(Rectangle){
-		// 		frameWidth * froggy.frame, 
-		// 		0, 
-		// 		// flip the texture horizontally depending on direction it's facing
-		// 		(froggy.direction == RIGHT) ? -frameWidth: frameWidth,	
-		// 		// flip the texture vertically when the frog is dead			
-		// 		froggy.texture.height * froggy.status}, 
-		// 	(Vector2){froggy.position.x, froggy.position.y}, 
-		// 	// change color based on whether alive or not
-		// 	(froggy.status == ALIVE) ? RAYWHITE : RED);				
+			(froggy.status == ALIVE) ? RAYWHITE : RED);	
 			 
 		draw_tongue(&froggy);
 
-
+		// draw fish
+		for (int i = 0; i < activeFish; i++) {
+			DrawTextureRec(
+				fishies[i].texture,
+				(Rectangle){
+					frameWidthFish * fishies[i].frame,
+					0,
+					frameWidthFish,
+					fishies[i].texture.height
+				},
+				(Vector2){ fishies[i].position.x, fishies[i].position.y},
+				RAYWHITE
+			);
+		}
 
 		// draw the bugs
 		for (int i = 0; i < activeMosquitoes; i++) {									
@@ -1101,6 +1182,8 @@ int main () {
 		DrawText(TextFormat("tonguetimer: %.2f", froggy.tongueTimer), 10, 340, 20, WHITE);
 		DrawText(TextFormat("attackduration: %.2f", froggy.attackDuration), 10, 370, 20, WHITE);
 		DrawText(TextFormat("size: %.2f", froggy.size), 10, 400, 20, WHITE);
+		DrawText(TextFormat("activeFish: %d", activeFish), 10, 430, 20, WHITE);
+
 		
 		if (froggy.status == DEAD) {
 			DrawText("FROGGY HAS PERISHED", 400, 400, 42, RED);
