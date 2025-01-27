@@ -15,6 +15,7 @@
 // find a better way to deal with level building
 // don't allow mid air jump
 // tongue hitbox very inaccurate when froggy y pos is higher (smaller) than bug y pos
+// have big fish attack on certain lilypads
 
 // multiplayer?
 
@@ -76,7 +77,8 @@ typedef struct Bug{
 	Vector2 spawnPosition;
 	float waveFrequency;
 	float waveAmplitude;
-	char* type;			
+	char* type;	
+	float frameTimer;		
 } Bug;
 
 typedef struct Lilypad{
@@ -342,6 +344,21 @@ void move_mosquito(Bug *mosquito, float deltaTime) {
 	}
 }
 
+// TODO: consider adding another wasp frame that's attempting to grab the froggy once
+// the wasp reaches a certain distance away from the froggy.
+void animate_wasp(Bug *wasp, float deltaTime, int maxFramesWasp) {
+	// flying animation for wasps
+	float frameDuration = 0.1f;
+	wasp->frameTimer += deltaTime;
+
+	if (wasp->frameTimer >= frameDuration) {
+		wasp->frameTimer = 0.0f;
+		wasp->frame++;
+		wasp->frame %= maxFramesWasp;
+	}
+}
+
+
 // TODO: maybe invert the spiral so the wasp doesn't auto kill itself
 // movement wasp
 void move_wasp(Bug *wasp, Frog *froggy, float deltaTime) {	
@@ -385,9 +402,9 @@ void move_wasp(Bug *wasp, Frog *froggy, float deltaTime) {
 
 		// TODO: implemetn wasp sprite with at least 2 frames
 		if (dif > 0.0) {
-			wasp->frame = 1;
+			wasp->direction = LEFT;
 		} else {
-			wasp->frame = 0;
+			wasp->direction = RIGHT;
 		}
 
 	} else if (wasp->isEaten) {
@@ -660,6 +677,7 @@ void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {
 	wasp->isActive = true;
 	wasp->type = "wasp";
 	wasp->isEaten = false;
+	wasp->frameTimer = 0.0f;
 }
 
 void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {	
@@ -783,12 +801,16 @@ int main () {
 	camera.zoom = 1.0f;
 
 	Texture2D mosquito_texture = LoadTexture("bug.png");
-	Texture2D wasp_texture = LoadTexture("wasp.png");
+	Texture2D wasp_texture = LoadTexture("WASP.png");
 
 	// mosquito (only 2 frames for directions)
 	const float frameWidthBug = (float)(mosquito_texture.width / 2);
 
-	// array of mosquitoes/ wasps
+	// wasp 2 frames for flying animation
+	const float frameWidthWasp = (float)(wasp_texture.width / 2);
+	const int maxFramesWasp = (int)(wasp_texture.width / frameWidthWasp);
+
+	// array of mosquitoes / wasps
 	Bug mosquitoes[MAX_MOSQUITOES];
 	Bug wasps[MAX_WASPS];
 
@@ -900,6 +922,7 @@ int main () {
 		// update wasps		
 		int activeWaspsAfterLoop = 0;
 		for (int i = 0; i < activeWasps; i++) {
+			animate_wasp(&wasps[i], deltaTime, maxFramesWasp); 
 			move_wasp(&wasps[i], &froggy, deltaTime);
 			collision_check_bugs(&froggy, &wasps[i], deltaTime);
 			eat_bug(&froggy, &wasps[i], deltaTime);
@@ -1036,15 +1059,21 @@ int main () {
 
 		// draw wasps
 		for (int i = 0; i < activeWasps; i++) {
-			DrawTextureRec(
+			DrawTexturePro(
 				wasps[i].texture,
 				(Rectangle){
+					frameWidthWasp * wasps[i].frame,
 					0,
-					0,
-					wasps[i].texture.width,
-					wasps[i].texture.height
+					frameWidthWasp * wasps[i].direction,
+					wasps[i].texture.height * wasps[i].status
 				},
-				(Vector2){ wasps[i].position.x, wasps[i].position.y },
+				(Rectangle){
+					wasps[i].position.x,
+					wasps[i].position.y,
+					frameWidthWasp * GetRandomValue(9, 10) / 10.0,					
+					(float)wasps[i].texture.height * GetRandomValue(9, 10) / 10.0},
+				(Vector2){ 0, 0},
+				0.0f,
 				RAYWHITE
 			);
 
