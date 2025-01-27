@@ -102,6 +102,7 @@ typedef struct Fish{
 	int frame;
 	bool isAttacking;
 	float attackDuration;
+	float attackTimer;
 	float frameTimer;
 	bool isActive;
 } Fish;
@@ -739,7 +740,7 @@ void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
 void animate_fish(Fish *fishy, float deltaTime, int maxFramesFish) {
 	// once fish is active, animate it (once).
 	// should b attacking 
-	if (fishy->isActive) {
+	if (fishy->isAttacking) {
 		float frameDuration = 0.2f;
 		fishy->frameTimer += deltaTime;
 
@@ -756,7 +757,6 @@ void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePa
 	// spawn when frog is near
 	// hitbox depends on the frame
 	// attack when frog is ontop of boobytrapped lilypad
-	fishy->texture = fish_texture;
 
 	// pick a random lilypad between 0 and the max active pads for a fish to spawn on
 	int randomValue = GetRandomValue(0, activePads - 1);	
@@ -765,16 +765,57 @@ void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePa
 	if (!pads[randomValue].hasFishtrap) {
 		fishy->position = pads[randomValue].position;	
 		fishy->isActive = true;
+		pads[randomValue].hasFishtrap = true;
 	}
 
+	fishy->frameTimer = 0.0f;
+	fishy->texture = fish_texture;
+	fishy->isAttacking = false;
+	fishy->attackDuration = 1.6f;	
+	fishy->isActive = true;
 }
 
 void activate_fish(Fish *fishy, Frog *froggy) {
-	if (fishy->isActive) {
-		// attack the frog when he's near
+	// fish hitbox 
+	fishy->hitbox = (Rectangle){
+		.x = fishy->position.x,
+		.y = fishy->position.y - 70.0f,
+		.width = 60.0f,
+		.height = 100.0f
+	};
+
+	// froggy hitbox
+	froggy->hitbox = (Rectangle){
+		.x = froggy->position.x + 10.0f,
+		.y = froggy->position.y + 1.0f,
+		.width = 35.0f,
+		.height = 35.0f
+	};
+
+	if (CheckCollisionRecs(fishy->hitbox, froggy->hitbox) && fishy->isActive) {
+		fishy->isAttacking = true;
 	}
 }
 
+void deactivate_fish(Fish *fishy, Frog *froggy, float deltaTime) {	
+	// deactivate fish at y distance difference			
+	if (fishy->isActive && (fishy->position.y > froggy->position.y + 1000.0f)) {
+		fishy->isActive = false;
+		fishy->isAttacking = false;
+	}
+
+	// deactivate after 1 attack
+	if (fishy->isAttacking) {
+		fishy->attackTimer += deltaTime;
+
+		
+		if (fishy->attackTimer >= fishy->attackDuration) {
+			fishy->isActive = false;
+			fishy->isAttacking = false;
+			fishy->attackTimer = 0.0f; 
+		}
+	}
+}
 
 int get_highscore() {    
     int highscore = 0;
@@ -932,7 +973,6 @@ int main () {
 		}
 
 
-
 		// TODO: this needs looked at still
 		// keep spawning lilypads, this time offscreen
 		if (froggy.position.y < nextLilypadSpawn) {
@@ -944,11 +984,9 @@ int main () {
 		}	
 
 		// spawn fish
-		if (activeFish < MAX_FISH) {
-			for (int i = 0; i < MAX_FISH; i++) {
-				spawn_fish(&fishies[activeFish], fish_texture, pads, activePads);
-				activeFish++;
-			}
+		if (activeFish < MAX_FISH) {			
+			spawn_fish(&fishies[activeFish], fish_texture, pads, activePads);
+			activeFish++;		
 		}
 		
 		if (froggy.status == ALIVE) {							
@@ -957,6 +995,7 @@ int main () {
 			move_frog(&froggy);				
 			frog_attack(&froggy, deltaTime, camera);			
 		}
+
 		screen_flip(&froggy);
 		apply_velocity(&froggy, deltaTime);	
 		apply_gravity(&froggy);
@@ -1013,13 +1052,15 @@ int main () {
 		// update fish
 		int activeFishAfterLoop = 0;
 		for (int i = 0; i < activeFish; i++) {
-			animate_fish(&fishies[i], deltaTime, maxFramesFish);
+			activate_fish(&fishies[i], &froggy);
+			animate_fish(&fishies[i], deltaTime, maxFramesFish);			
+			deactivate_fish(&fishies[i], &froggy, deltaTime);
 
 			if (fishies[i].isActive) {
 				fishies[activeFishAfterLoop++] = fishies[i];
 			}	
 		}
-		activeFish = activeFishAfterLoop;
+		activeFish = activeFishAfterLoop;	
 
 		// if froggy below ground, put it back on ground
     	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
@@ -1100,6 +1141,9 @@ int main () {
 
 		// draw fish
 		for (int i = 0; i < activeFish; i++) {
+			// only draw while active
+			if (!fishies[i].isActive) continue;
+
 			DrawTextureRec(
 				fishies[i].texture,
 				(Rectangle){
@@ -1111,6 +1155,9 @@ int main () {
 				(Vector2){ fishies[i].position.x, fishies[i].position.y},
 				RAYWHITE
 			);
+
+			// draw fish hitbox
+			DrawRectangleLinesEx(fishies[i].hitbox, 1, RED); 
 		}
 
 		// draw the bugs

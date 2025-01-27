@@ -18,7 +18,7 @@
 #define WASP_VELOCITY_DEATH_FALL 460.0f
 
 // fish
-#define MAX_FISH 3
+#define MAX_FISH 10
 
 // lilly pads
 #define MAX_LILLYPADS 1000
