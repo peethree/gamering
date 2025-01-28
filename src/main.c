@@ -91,7 +91,7 @@ typedef struct Lilypad{
 	Rectangle hitbox;
 	int frame;
 	bool isActive;
-	bool hasFishtrap;
+	bool hasFishTrap;
 } Lilypad;
 
 
@@ -109,7 +109,7 @@ typedef struct Fish{
 
 
 // gravity frog
-void apply_gravity(Frog *froggy) {
+void apply_gravity(Frog *froggy) {	
 	froggy->velocity.y += 36.0;
 	if (froggy->velocity.y > FROGGY_FALL_VELOCITY) {
 		froggy->velocity.y = FROGGY_FALL_VELOCITY;
@@ -151,7 +151,7 @@ void frog_baby_jump(Frog *froggy, int maxFrames, float deltaTime) {
 
 	// froggy->velocity.x = 0.0;
 	if (froggy->status == ALIVE) {
-		if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
+		if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {			
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.7;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;			
@@ -170,7 +170,7 @@ void frog_big_jump(Frog *froggy, int maxFrames, float deltaTime) {
 
 	if (froggy->status == ALIVE) {
 		// jump (prevent double jumps) TODO: fix mid air jump
-		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {
+		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {			
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;			
@@ -221,6 +221,16 @@ void screen_flip(Frog *froggy) {
 	} else if (froggy->position.x > (float)GetScreenWidth() + froggy->texture.width / 8) {
 		froggy->position.x = 0.0f;
 	}
+}
+
+void frog_hitbox(Frog *froggy) {
+	// update frog hitbox in one place
+	froggy->hitbox = (Rectangle){
+		.x = froggy->position.x - 20.0f,
+		.y = froggy->position.y - 20.0f,
+		.width = 35.0f,
+		.height = 35.0f
+	};	
 }
  
 void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {	
@@ -435,7 +445,7 @@ void move_wasp(Bug *wasp, Frog *froggy, float deltaTime) {
 }
 
 // velocity frog
-void apply_velocity(Frog *froggy, float deltaTime) {
+void apply_velocity(Frog *froggy, float deltaTime) {	
 	froggy->position.x += froggy->velocity.x * deltaTime;
 	froggy->position.y += froggy->velocity.y * deltaTime;
 }	
@@ -496,13 +506,6 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
 
 void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 	// hitboxes need to be updated every loop	
-	// frog hitbox
-	froggy->hitbox = (Rectangle){
-		.x = froggy->position.x + 10.0f,
-		.y = froggy->position.y + 1.0f,
-		.width = 35.0f,
-		.height = 35.0f
-	};
 
 	// mosquito hitbox
 	if (bug->type == "mosquito") {	
@@ -585,21 +588,13 @@ void froggy_death(Frog *froggy) {
 
 // collision
 void collision_check_pads(Frog *froggy, Lilypad *pad) {	
-	// frog hitbox
-	froggy->hitbox = (Rectangle){
-		.x = froggy->position.x + 10.0f,
-		.y = froggy->position.y + 1.0f,
-		.width = 35.0f,
-		.height = 35.0f
-	};
-
 	// lilypad hitbox(es)
 	if (pad->frame == 0) {
 		pad->hitbox = (Rectangle){
 			.x = pad->position.x + 5.0f,
-			.y = pad->position.y + 20.0f,
+			.y = pad->position.y + 15.0f,
 			.width = 90.0f,
-			.height = 1.0f
+			.height = 3.0f
 		};
 	} 
 
@@ -608,35 +603,58 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 			.x = pad->position.x + 5.0f,
 			.y = pad->position.y + 15.0f,
 			.width = 85.0f,
-			.height = 1.0f
+			.height = 3.0f
 		};
 	} 
 
 	if (pad->frame == 2) {
 		pad->hitbox = (Rectangle){
 			.x = pad->position.x + 5.0f,
-			.y = pad->position.y + 10.0f,
+			.y = pad->position.y + 15.0f,
 			.width = 60.0f,
-			.height = 1.0f
+			.height = 3.0f
 		};
 	} 
 
 	if (pad->frame == 3) {
 		pad->hitbox = (Rectangle){
 			.x = pad->position.x + 0.0f,
-			.y = pad->position.y + 40.0f,
+			.y = pad->position.y + 15.0f,
 			.width = 50.0f,
-			.height = 1.0f
+			.height = 3.0f
 		};
 	}
 
-	// frog lilypad collision
-	// allow the frog to jump through the lilypads, but catch it when it falls
+    //TODO: frog lilypad collision is REAL nasty atm, look INTO it
+   	
+//         // if froggy is below the pad
+// 	if (froggy->position.y > pad->position.y && pad->isActive) {	
+// 		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {		
+// 			froggy->position.y = pad->hitbox.y - froggy->hitbox.height;
+// 			froggy->onPad = true;
+// 			froggy->frame = 1;
+// 			// froggy->velocity.y = 0.0f;
+// 		}
+// 	}
+//     // if froggy is above the pad
+// 	else if (froggy->position.y < pad->position.y && pad->isActive) {
+// 		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {
+//             froggy->position.y = pad->hitbox.y - froggy->hitbox.height; 
+//             froggy->velocity.y = 0.0f;             
+//             froggy->isJumping = false;	
+// 			froggy->onPad = true;
+//         }
+//     }
+// }
+
+	// ideally: if frog velocity is negative (meaning frog is going up, do nothing when colliding with lilypad)
+	// otherwise, catch the froggy (update the position upon collision)
+
+	// froggy is below the pad
 	if (froggy->position.y > pad->position.y && pad->isActive) {
-		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {	
-			// smoother transition						
+		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {									
 			froggy->position.y += (pad->position.y - froggy->position.y) * 0.9f;	
-			
+
 			// froggy is not moving up or down vertically (or affected by max gravity)
 			if (froggy->velocity.y == FROGGY_FALL_VELOCITY && froggy->status == ALIVE) {
 				froggy->frame = 1;
@@ -709,7 +727,7 @@ void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
 	};
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;	
-	pad->hasFishtrap = false;
+	pad->hasFishTrap = false;
 }
 
 void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
@@ -722,7 +740,7 @@ void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *frog
 	};	
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;
-	pad->hasFishtrap = false;
+	pad->hasFishTrap = false;
 }
 
 void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
@@ -754,18 +772,14 @@ void animate_fish(Fish *fishy, float deltaTime, int maxFramesFish) {
 
 // fish lays (swims) in ambush at location of the lilypads
 void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePads) {
-	// spawn when frog is near
-	// hitbox depends on the frame
-	// attack when frog is ontop of boobytrapped lilypad
-
-	// pick a random lilypad between 0 and the max active pads for a fish to spawn on
+	// pick a random lilypad between 0 and the max active pads for a fish to spawn under
 	int randomValue = GetRandomValue(0, activePads - 1);	
 
 	// don't double spawn fish on lilypads
-	if (!pads[randomValue].hasFishtrap) {
+	if (!pads[randomValue].hasFishTrap) {
 		fishy->position = pads[randomValue].position;	
 		fishy->isActive = true;
-		pads[randomValue].hasFishtrap = true;
+		pads[randomValue].hasFishTrap = true;
 	}
 
 	fishy->frameTimer = 0.0f;
@@ -773,27 +787,102 @@ void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePa
 	fishy->isAttacking = false;
 	fishy->attackDuration = 1.6f;	
 	fishy->isActive = true;
+	fishy->attackTimer = 0.0f;
+	fishy->frame = 0;
 }
 
 void activate_fish(Fish *fishy, Frog *froggy) {
-	// fish hitbox 
-	fishy->hitbox = (Rectangle){
-		.x = fishy->position.x,
-		.y = fishy->position.y - 70.0f,
-		.width = 60.0f,
-		.height = 100.0f
-	};
 
-	// froggy hitbox
-	froggy->hitbox = (Rectangle){
-		.x = froggy->position.x + 10.0f,
-		.y = froggy->position.y + 1.0f,
-		.width = 35.0f,
-		.height = 35.0f
-	};
+	if (!fishy->isAttacking) {
+		// fish hitbox 
+		fishy->hitbox = (Rectangle){
+			.x = fishy->position.x,
+			.y = fishy->position.y,
+			.width = 60.0f,
+			.height = 20.0f
+		};	
 
-	if (CheckCollisionRecs(fishy->hitbox, froggy->hitbox) && fishy->isActive) {
-		fishy->isAttacking = true;
+		if (CheckCollisionRecs(fishy->hitbox, froggy->hitbox) && fishy->isActive) {
+			fishy->isAttacking = true;
+		}
+	}
+}
+
+// after fish has been activated, change hitbox based on the frame
+void attacking_fish_collision(Fish *fishy, Frog *froggy) {
+	switch(fishy->frame) {
+		case 0:
+			fishy->hitbox = (Rectangle){			
+				.x = fishy->position.x,
+				.y = fishy->position.y,
+				.width = 60.0f,
+				.height = 20.0f
+			};
+			break;
+		case 1:
+			fishy->hitbox = (Rectangle){			
+				.x = fishy->position.x,
+				.y = fishy->position.y + 30.0f,
+				.width = 60.0f,
+				.height = 30.0f
+			};		
+			break;	
+		case 2:
+			fishy->hitbox = (Rectangle){			
+				.x = fishy->position.x,
+				.y = fishy->position.y + 30.0f,
+				.width = 60.0f,
+				.height = 40.0f
+			};
+			break;
+		case 3:
+			fishy->hitbox = (Rectangle){			
+				.x = fishy->position.x,
+				.y = fishy->position.y + 30.0f,
+				.width = 60.0f,
+				.height = 60.0f
+			};
+			break;
+		case 4:
+			fishy->hitbox = (Rectangle){			
+				.x = fishy->position.x,
+				.y = fishy->position.y + 30.0f,
+				.width = 60.0f,
+				.height = 80.0f
+			};
+			break;
+		case 5:
+			fishy->hitbox = (Rectangle){			
+				.x = fishy->position.x,
+				.y = fishy->position.y + 30.0f,
+				.width = 60.0f,
+				.height = 70.0f
+			};
+			break;	
+		case 6:
+			fishy->hitbox = (Rectangle){			
+				.x = fishy->position.x,
+				.y = fishy->position.y + 30.0f,
+				.width = 60.0f,
+				.height = 40.0f
+			};
+			break;
+		case 7:
+			fishy->hitbox = (Rectangle){			
+				.x = fishy->position.x,
+				.y = fishy->position.y + 30.0f,
+				.width = 60.0f,
+				.height = 1.0f
+			};
+			break;
+		default:
+			break;
+	}
+
+	if (fishy->isAttacking && fishy->frame > 1) {
+		if (CheckCollisionRecs(fishy->hitbox, froggy->hitbox)) {
+			froggy->health -= 0.05;
+		}
 	}
 }
 
@@ -807,7 +896,6 @@ void deactivate_fish(Fish *fishy, Frog *froggy, float deltaTime) {
 	// deactivate after 1 attack
 	if (fishy->isAttacking) {
 		fishy->attackTimer += deltaTime;
-
 		
 		if (fishy->attackTimer >= fishy->attackDuration) {
 			fishy->isActive = false;
@@ -886,7 +974,7 @@ int main () {
 		.tongue = (Rectangle){800, 1280, 0, 0},
 		.tongueHitbox = (Rectangle){800, 1280, 0, 0},
 		.attackDuration = FROGGY_ATTACK_DURATION,
-		.size = 1.0
+		.size = 1.0		
 	};		
 
 	// 8 pictures on the frog sprite sheet -> 
@@ -988,8 +1076,10 @@ int main () {
 			spawn_fish(&fishies[activeFish], fish_texture, pads, activePads);
 			activeFish++;		
 		}
+
+		frog_hitbox(&froggy);
 		
-		if (froggy.status == ALIVE) {							
+		if (froggy.status == ALIVE) {									
 			frog_baby_jump(&froggy, maxFrames, deltaTime);
 			frog_big_jump(&froggy, maxFrames, deltaTime);
 			move_frog(&froggy);				
@@ -1053,8 +1143,9 @@ int main () {
 		int activeFishAfterLoop = 0;
 		for (int i = 0; i < activeFish; i++) {
 			activate_fish(&fishies[i], &froggy);
-			animate_fish(&fishies[i], deltaTime, maxFramesFish);			
-			deactivate_fish(&fishies[i], &froggy, deltaTime);
+			animate_fish(&fishies[i], deltaTime, maxFramesFish);	
+			attacking_fish_collision(&fishies[i], &froggy);		
+			deactivate_fish(&fishies[i], &froggy, deltaTime);			
 
 			if (fishies[i].isActive) {
 				fishies[activeFishAfterLoop++] = fishies[i];
@@ -1085,7 +1176,7 @@ int main () {
 		}
 
 		// debugging: visual hitboxes
-		// DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 	
+		DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 	
 			
 		for (int i = 0; i < activePads; i++) {		
 			if (!pads[i].isActive) continue;
@@ -1104,7 +1195,7 @@ int main () {
 			);
 			
 			// lilypad hitbox visual
-			// DrawRectangleLinesEx(pads[i].hitbox, 1, RED); 			
+			DrawRectangleLinesEx(pads[i].hitbox, 1, RED); 			
 		}
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
@@ -1230,6 +1321,7 @@ int main () {
 		DrawText(TextFormat("attackduration: %.2f", froggy.attackDuration), 10, 370, 20, WHITE);
 		DrawText(TextFormat("size: %.2f", froggy.size), 10, 400, 20, WHITE);
 		DrawText(TextFormat("activeFish: %d", activeFish), 10, 430, 20, WHITE);
+
 
 		
 		if (froggy.status == DEAD) {
