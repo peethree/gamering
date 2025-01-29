@@ -5,7 +5,6 @@
 #include <stdio.h> 
 
 // TODO: 
-// put lilypad hitbox logic in switch statement
 // consider putting big jump on a timer now that there's a small jump
 // slowdown tongue attack ?
 // move the bugs along with the tongue endpoint until the tongue's at the furthest point, then pull them back as it retracts
@@ -44,6 +43,7 @@ typedef struct Frog{
 	Rectangle tongue;
 	Rectangle tongueHitbox;
 	bool isAttacking;
+	bool isShooting;
     float tongueTimer;
     float attackDuration;
 	float tongueAngle;
@@ -58,6 +58,7 @@ typedef struct Frog{
 	float size;
 	int score;
 	int bugsEaten;
+	float spitAngle;
 } Frog;
 
 typedef struct Bug{	
@@ -84,6 +85,14 @@ typedef struct Bug{
 	char* type;	
 	float frameTimer;		
 } Bug;
+
+typedef struct Bugspit{
+	Texture2D texture;
+	Vector2 position;
+	Vector2 velocity;
+	bool isActive;
+	float angle;
+} Bugspit;
 
 typedef struct Lilypad{
 	Texture2D texture;
@@ -179,7 +188,6 @@ void frog_big_jump(Frog *froggy, int maxFrames, float deltaTime) {
 			
 		}	
 	}
-
 	jump_animation(froggy, maxFrames, deltaTime, frameDuration);		
 }
 
@@ -230,18 +238,10 @@ void frog_hitbox(Frog *froggy) {
 	};	
 }
  
-void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {	
-	// despawn tongue when froggy dies
-	if (froggy->status == DEAD) {
-		froggy->isAttacking = false;
-	}
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking) {
-        froggy->isAttacking = true;
-        froggy->tongueTimer = 0.0f;        
-    }
-
-    // attack animation
+// TODO: put tongue attack and spit in different helper functions
+void tongue_attack(Frog *froggy, float angle, Vector2 frogMouthPosition, float deltaTime, Vector2 cameraMousePosition) {
+	// attack animation
     if (froggy->isAttacking) {
         froggy->tongueTimer += deltaTime;
         float progress;
@@ -257,35 +257,14 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
 
         // tongue length calculation
         float currentLength = FROGGY_TONGUE_LENGTH * progress;
-
-		// keep track of cursor coordinates, translate them into camera coords for hitbox logic
-        Vector2 cursorPosition = GetMousePosition();
-		Vector2 cameraMousePosition = GetScreenToWorld2D(cursorPosition, camera);
-
-		// keep track of where on the sprite the tongue should appear from
-		Vector2 frogMouthPosition;
-		if (froggy->direction == RIGHT) {				//offsets to spawn tongue closer to mouth
-			frogMouthPosition.x = froggy->position.x + (7.0f * froggy->size * 1.9);
-			frogMouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9);
-		} else {
-			frogMouthPosition.x = froggy->position.x - (7.0f * froggy->size * 1.9);
-			frogMouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9);				
-		}
-
-        // direction vectors
-        float dx = cameraMousePosition.x - frogMouthPosition.x;
-        float dy = cameraMousePosition.y - frogMouthPosition.y;
-        
-        // angle
-        float angle = atan2f(dy, dx);
         
         // tongue endpoint
         float tongueEndX = frogMouthPosition.x + cosf(angle) * currentLength;
         float tongueEndY = frogMouthPosition.y + sinf(angle) * currentLength;
         
-        // turn frog in direction of the mouseclick, added deadzone		
-        froggy->direction = (cameraMousePosition.x < frogMouthPosition.x + 10.0f) ? LEFT : RIGHT;
-		
+        // TODO: this spazzes out the frog
+		// turn frog in direction of the mouseclick, added deadzone		
+        froggy->direction = (cameraMousePosition.x < frogMouthPosition.x + 10.0f) ? LEFT : RIGHT;		
 
 		// tongue rectangle
         froggy->tongue = (Rectangle){
@@ -312,7 +291,6 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
         };
         
 		// taper hitbox near the end of its length
-		// 
 		float currentHitboxWidth = tongueWidth * (1.0f - (currentLength / (FROGGY_TONGUE_LENGTH)) * 0.5f); 
         // ceate hitbox as a rectangle that encompasses the rotated tongue
         froggy->tongueHitbox = (Rectangle){
@@ -331,12 +309,141 @@ void frog_attack(Frog *froggy, float deltaTime, Camera2D camera) {
             froggy->tongueHitbox = (Rectangle){ 800, 1280, 0, 0 };
             froggy->tongueAngle = 0.0f;
         }
-    }
+	}
+}
+
+// use the eaten bugs as ammo to kill wasps
+void spit_bug(Frog *froggy, float angle, Vector2 frogMouthPosition, Vector2 cameraMousePosition, Texture2D mosquito_texture, int *activeSpit, Bugspit spitties[]) {	
+	if (froggy->bugsEaten > 0 && *activeSpit < FROGGY_MAX_BUG_SPIT) {
+		if (froggy->isShooting) {
+			// decrement bugs eaten
+			froggy->bugsEaten--;			
+			froggy->direction = (cameraMousePosition.x < frogMouthPosition.x + 10.0f) ? LEFT : RIGHT;
+
+			// for drawing?
+			froggy->spitAngle = angle * RAD2DEG;
+
+			// direction x, y
+			Vector2 spitDirection = {
+				cosf(angle),
+				sinf(angle)
+			};
+
+			// initialize new bug spit at activespit index
+			spitties[*activeSpit] = (Bugspit){
+				.position = frogMouthPosition,
+				.texture = mosquito_texture,
+				.isActive = true,
+				.velocity = (Vector2){
+					spitDirection.x * FROGGY_BUG_SPIT_SPEED,
+					spitDirection.y * FROGGY_BUG_SPIT_SPEED
+				}
+			};	
+
+			// increment amount active
+			(*activeSpit)++;	
+		}
+	} 
+}
+
+void draw_spit(Bugspit *spitty) {
+	DrawTexture(
+		spitty->texture, 
+		spitty->position.x, 
+		spitty->position.y, 
+		RAYWHITE);
+}
+
+// apply velocity to spit projectile
+void spit_velocity(Bugspit *spitty, float deltaTime) {
+	spitty->position.x += spitty->velocity.x * deltaTime;
+	spitty->position.y += spitty->velocity.y * deltaTime;
+}
+
+// deactivate offscreen spits
+void deactivate_spit(Bugspit *spitty, Frog *froggy, int *activeSpit) {
+	// 	clean up spits at y distance difference
+	if (spitty->isActive && (spitty->position.y > froggy->position.y + 1000.0f || spitty->position.y < froggy->position.y - 1000.0f)) {
+		spitty->isActive = false;
+		(*activeSpit)--;
+	}
+
+	if (spitty->isActive && (spitty->position.x > 1300.0f || spitty->position.x < -100.0f)) {
+		spitty->isActive = false;
+		(*activeSpit)--;
+	}
+}
+ 
+void frog_attacks(Frog *froggy, float deltaTime, Camera2D camera, Texture2D mosquito_texture, int *activeSpit, Bugspit *spitties) {	
+	// despawn tongue when froggy dies
+	if (froggy->status == DEAD) {
+		froggy->isAttacking = false;
+		froggy->isShooting = false;
+	}
+
+	// keep track of cursor coordinates, translate them into camera coords for hitbox logic
+	Vector2 cursorPosition = GetMousePosition();
+	Vector2 cameraMousePosition = GetScreenToWorld2D(cursorPosition, camera);
+
+	// keep track of where on the sprite the tongue should appear from
+	Vector2 frogMouthPosition;
+	if (froggy->direction == RIGHT) {				//offsets to spawn tongue closer to mouth
+		frogMouthPosition.x = froggy->position.x + (7.0f * froggy->size * 1.9);
+		frogMouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9);
+	} else {
+		frogMouthPosition.x = froggy->position.x - (7.0f * froggy->size * 1.9);
+		frogMouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9);				
+	}
+
+	// direction vectors
+	float dx = cameraMousePosition.x - frogMouthPosition.x;
+	float dy = cameraMousePosition.y - frogMouthPosition.y;
+	
+	// angle
+	float angle = atan2f(dy, dx);
+
+	// tongue lash
+	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && !froggy->isShooting) {
+        froggy->isAttacking = true;
+        froggy->tongueTimer = 0.0f;        
+    }	
+	tongue_attack(froggy, angle, frogMouthPosition, deltaTime, cameraMousePosition);	
+
+	// spit bug
+	if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) && !froggy->isAttacking && !froggy->isShooting) {
+		froggy->isShooting = true;
+	}
+	spit_bug(froggy, angle, frogMouthPosition, cameraMousePosition, mosquito_texture, activeSpit, spitties);
+	froggy->isShooting = false;
+}
+
+
+void draw_mosquito_spit(Frog *froggy, Texture2D mosquito_texture) {
+	// TODO: fill in source / dest / rotation etc
+	if (froggy->isShooting) {
+		DrawTexturePro(
+			mosquito_texture,			
+			(Rectangle){ //source
+				0,
+				0,
+				0,
+				0
+			},			
+			(Rectangle){ //dest
+				0,
+				0,
+				0,
+				0
+			},
+			(Vector2){ 0, 0 }, //origin
+			0, // rotation
+			RAYWHITE
+		);
+	}
 }
 
 void draw_tongue(Frog *froggy) {
 	if (froggy->isAttacking) {
-
         DrawRectanglePro(
 			froggy->tongue,
 			(Vector2){0, FROGGY_TONGUE_WIDTH / 2},		
@@ -913,6 +1020,7 @@ void deactivate_fish(Fish *fishy, Frog *froggy, float deltaTime) {
 	}
 }
 
+
 int get_highscore() {    
     int highscore = 0;
 
@@ -983,7 +1091,8 @@ int main () {
 		.tongueHitbox = (Rectangle){ 800, 1280, 0, 0 },
 		.attackDuration = FROGGY_ATTACK_DURATION,
 		.size = 1.0,	
-		.bugsEaten = 0
+		.bugsEaten = 0,
+		.isShooting = false
 	};		
 
 	// 8 pictures on the frog sprite sheet -> 
@@ -1016,21 +1125,21 @@ int main () {
 	Bug mosquitoes[MAX_MOSQUITOES];
 	Bug wasps[MAX_WASPS];
 	Fish fishies[MAX_FISH];
+	Bugspit spitties[FROGGY_MAX_BUG_SPIT];
+	Lilypad pads[MAX_LILLYPADS];
 
 	int activeMosquitoes = 0;	
 	int activeWasps = 0;	
 	int activeFish = 0;
+	int activeSpit = 0;
+	int activePads = 0;
 
 	// bug spawntimer
 	float mosquitoSpawnTimer = MOSQUITO_SPAWN_TIMER;		
 	float waspSpawnTimer = WASP_SPAWN_TIMER;	
 
 	// lilipad init
-	Texture2D lilypad_texture = LoadTexture("lilipads.png");
-
-	// keep track of the lilypads
-	Lilypad pads[MAX_LILLYPADS];
-	int activePads = 0;
+	Texture2D lilypad_texture = LoadTexture("lilipads.png");	
 	
 	// 4 frames in lilypad sprite sheet
 	const float frameWidthLilypad = (float)(lilypad_texture.width / 4);	
@@ -1091,10 +1200,10 @@ int main () {
 		if (froggy.status == ALIVE) {									
 			frog_baby_jump(&froggy, maxFrames, deltaTime);
 			frog_big_jump(&froggy, maxFrames, deltaTime);
-			move_frog(&froggy);				
-			frog_attack(&froggy, deltaTime, camera);			
+			move_frog(&froggy);						
 		}
 
+		frog_attacks(&froggy, deltaTime, camera, mosquito_texture, &activeSpit, spitties);	
 		screen_flip(&froggy);
 		apply_velocity(&froggy, deltaTime);	
 		apply_gravity(&froggy);
@@ -1104,6 +1213,17 @@ int main () {
         if (froggy.score > highscore) {
             highscore = froggy.score;
         }
+
+		// update spitties
+		int activeSpitAfterLoop = 0;
+		for (int i = 0; i < activeSpit; i++) {
+			spit_velocity(&spitties[i], deltaTime);
+			deactivate_spit(&spitties[i], &froggy, &activeSpit);
+
+			if (spitties[i].isActive) {
+				spitties[activeSpitAfterLoop++] = spitties[i];
+			}
+		}
 
 		// update lillypads
 		int activePadsAfterLoop = 0;		
@@ -1239,6 +1359,12 @@ int main () {
 			 
 		draw_tongue(&froggy);
 
+		for (int i = 0; i < activeSpit; i++) {
+			if (!spitties[i].isActive) continue;
+			
+			draw_spit(&spitties[i]);
+		}
+
 		// draw fish
 		for (int i = 0; i < activeFish; i++) {
 			// only draw while active
@@ -1331,6 +1457,8 @@ int main () {
 		DrawText(TextFormat("size: %.2f", froggy.size), 10, 400, 20, WHITE);
 		DrawText(TextFormat("activeFish: %d", activeFish), 10, 430, 20, WHITE);
 		DrawText(TextFormat("bugsEaten: %d", froggy.bugsEaten), 10, 460, 20, WHITE);
+		DrawText(TextFormat("isShooting: %d", froggy.isShooting), 10, 490, 20, WHITE);
+		DrawText(TextFormat("activeSpit: %d", activeSpit), 10, 520, 20, WHITE);
 
 
 		
