@@ -10,7 +10,8 @@
 // move the bugs along with the tongue endpoint until the tongue's at the furthest point, then pull them back as it retracts
 // SPIT eaten mosquitoes to damage wasps.
 // make landing on lilypads smoother ideally only interact with the pad when falling from above. keep track of y coordinate when jump was initiated?
-
+// use jumpheight to fix lilypad interactions as well as jumping on bugs
+// fix fish hitboxes 
 // add some kind of menu when the game is over
 // add more bug movement patterns
 // add proximity based bug buzzing
@@ -52,6 +53,7 @@ typedef struct Frog{
 	bool isJumping; 
 	bool isBouncing;	
 	int frame;
+	float jumpHeight;
 	float jumpTimer; 
 	float frameTimer; 
 	float highestPosition;
@@ -161,7 +163,8 @@ void frog_baby_jump(Frog *froggy, int maxFrames, float deltaTime) {
 		if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {			
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.7;		
 			froggy->isJumping = true;
-			froggy->jumpTimer = jumpDuration;			
+			froggy->jumpTimer = jumpDuration;	
+			froggy->jumpHeight = froggy->position.y;		
 
 			// start at second/third frame for more believable jump animation
 			froggy->frame = 2;          
@@ -180,7 +183,8 @@ void frog_big_jump(Frog *froggy, int maxFrames, float deltaTime) {
 		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {			
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
 			froggy->isJumping = true;
-			froggy->jumpTimer = jumpDuration;			
+			froggy->jumpTimer = jumpDuration;	
+			froggy->jumpHeight = froggy->position.y;		
 
 			// start at second/third frame for more believable jump animation
 			froggy->frame = 2;          
@@ -330,6 +334,7 @@ void spit_bug(Frog *froggy, float angle, Vector2 frogMouthPosition, Vector2 came
 			};
 
 			// initialize new bug spit at activespit index
+			// TODO: fix the texture, is now 2 frames, maybe make frumbled up sticky bug
 			spitties[*activeSpit] = (Bugspit){
 				.position = frogMouthPosition,
 				.texture = mosquito_texture,
@@ -662,7 +667,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 
 			// bump froggy down when trying to jump through a bug
 			// TODO: instead of bump down, slow velocity
-			froggy->velocity.y *= 0.50;
+			// froggy->velocity.y *= 0.50;
 
 			// TODO: get horizontal bump to work // add a graceperiod so bug damage is more consistent
 			// froggy is further left than bug
@@ -1359,9 +1364,10 @@ int main () {
 			 
 		draw_tongue(&froggy);
 
+		// draw bug spit
 		for (int i = 0; i < activeSpit; i++) {
 			if (!spitties[i].isActive) continue;
-			
+
 			draw_spit(&spitties[i]);
 		}
 
@@ -1459,6 +1465,7 @@ int main () {
 		DrawText(TextFormat("bugsEaten: %d", froggy.bugsEaten), 10, 460, 20, WHITE);
 		DrawText(TextFormat("isShooting: %d", froggy.isShooting), 10, 490, 20, WHITE);
 		DrawText(TextFormat("activeSpit: %d", activeSpit), 10, 520, 20, WHITE);
+		DrawText(TextFormat("jumpheight: %.2f", froggy.jumpHeight), 10, 550, 20, WHITE);
 
 
 		
