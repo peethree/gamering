@@ -5,6 +5,8 @@
 #include <stdio.h> 
 
 // TODO: 
+// if falling velocity -> allow bug jumping
+// add little hearts you can collect to restore health
 // scoring is a MESS atm
 // use the statuses instead of various booleans to clean up structs a bit??? might be a shit idea
 // cooldown on bug spit, allow bursts of three bugs
@@ -19,10 +21,6 @@
 // find a better way to deal with level building
 // don't allow mid air jump
 // tongue hitbox very inaccurate when froggy y pos is higher (smaller) than bug y pos
-// have big fish attack on certain lilypads
-
-// multiplayer?
-
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
 
@@ -43,59 +41,59 @@ typedef enum Status{
 	FISHTRAPPED = 8,
 } Status;
 
-typedef struct Frog{
-	Texture2D texture;		
-	Rectangle position;
-	Vector2 velocity;
-	Direction direction;
-	Rectangle hitbox;
-	Rectangle tongue;
-	Rectangle tongueHitbox;
-	Vector2 mouthPosition;
-	bool isAttacking;
-	bool isShooting;
+typedef struct Frog {
+    Texture2D texture;
+    Rectangle position;
+    Rectangle hitbox;
+    Rectangle tongue;
+    Rectangle tongueHitbox;
+    Vector2 velocity;
+    Vector2 mouthPosition;
     float tongueTimer;
     float attackDuration;
-	float tongueAngle;
-	float health;
-	Status status;	
-	bool isJumping; 
-	bool isBouncing;	
-	int frame;
-	float jumpHeight;
-	float jumpTimer; 
-	float frameTimer; 
-	float highestPosition;
-	float size;
-	int score;
-	int bugsEaten;
-	float spitAngle;
+    float tongueAngle;
+    float health;
+    float jumpHeight;
+    float jumpTimer;
+    float frameTimer;
+    float highestPosition;
+    float size;
+    float spitAngle;
+    int frame;
+    int score;
+    int bugsEaten;
+    Direction direction;
+    Status status;
+    bool isAttacking;
+    bool isShooting;
+    bool isJumping;
+    bool isBouncing;
 } Frog;
 
 typedef struct Bug{	
 	Texture2D texture;
 	Rectangle position;
-	Vector2 velocity;
-	Direction direction;
 	Rectangle hitbox;
-	int frame;
-	Status status;	
+	Rectangle previousPosition;	
+	Direction direction;
+	Vector2 velocity;
 	Vector2 targetPosition;
+	Vector2 spawnPosition;
 	Vector2 desiredVelocity;
-	Rectangle previousPosition;
-	bool isActive;	
-	bool isEaten;	
+	char* type;	
 	float angle;
 	float radius;
 	float spiralSpeed;
 	float convergence;	
-	float minRadius; 
-	Vector2 spawnPosition;
+	float minRadius; 	
 	float waveFrequency;
 	float waveAmplitude;
-	char* type;	
 	float frameTimer;	
-	float health;	
+	float health;
+	int frame;
+	Status status;			
+	bool isActive;	
+	bool isEaten;	
 } Bug;
 
 typedef struct Bugspit{
@@ -104,8 +102,8 @@ typedef struct Bugspit{
 	Vector2 position;
 	Vector2 velocity;
 	Status status;
-	bool isActive;
-	float angle;	
+	float angle;
+	bool isActive;		
 } Bugspit;
 
 typedef struct Lilypad{
@@ -122,13 +120,13 @@ typedef struct Fish{
 	Texture2D texture;
 	Rectangle position;
 	Rectangle hitbox;
-	Status status;
-	int frame;
-	bool isAttacking;
 	float attackDuration;
 	float attackTimer;
 	float frameTimer;
+	Status status;
+	int frame;
 	bool isActive;
+	bool isAttacking;
 } Fish;
 
 // gravity frog
@@ -499,7 +497,7 @@ void draw_tongue(Frog *froggy) {
 			RED
 		);
 		
-		//    DrawRectanglePro(
+		// DrawRectanglePro(
 		// 	froggy->tongueHitbox,
 		// 	(Vector2){ 0, FROGGY_TONGUE_WIDTH },
 		// 	froggy->tongueAngle,
@@ -960,6 +958,7 @@ void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePa
 	fishy->frame = 0;
 }
 
+// trigger fish attack 
 void activate_fish(Fish *fishy, Frog *froggy) {
 	if (!fishy->isAttacking) {
 		// fish hitbox 
@@ -976,6 +975,7 @@ void activate_fish(Fish *fishy, Frog *froggy) {
 	}
 }
 
+// TODO: hitboxes are growing downward instead of upward
 // after fish has been activated, change hitbox based on the frame
 void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 	switch(fishy->frame) {
@@ -990,7 +990,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 		case 1:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
-				.y = fishy->position.y + 30.0f,
+				.y = fishy->position.y + 20.0f,
 				.width = 60.0f,
 				.height = 30.0f
 			};		
@@ -998,7 +998,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 		case 2:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
-				.y = fishy->position.y + 30.0f,
+				.y = fishy->position.y + 15.0f,
 				.width = 60.0f,
 				.height = 40.0f
 			};
@@ -1006,7 +1006,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 		case 3:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
-				.y = fishy->position.y + 30.0f,
+				.y = fishy->position.y - 10.0f,
 				.width = 60.0f,
 				.height = 60.0f
 			};
@@ -1014,7 +1014,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 		case 4:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
-				.y = fishy->position.y + 30.0f,
+				.y = fishy->position.y - 40.0f,
 				.width = 60.0f,
 				.height = 80.0f
 			};
@@ -1022,7 +1022,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 		case 5:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
-				.y = fishy->position.y + 30.0f,
+				.y = fishy->position.y - 30.0f,
 				.width = 60.0f,
 				.height = 70.0f
 			};
@@ -1030,7 +1030,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 		case 6:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
-				.y = fishy->position.y + 30.0f,
+				.y = fishy->position.y - 20.0f,
 				.width = 60.0f,
 				.height = 40.0f
 			};
@@ -1038,7 +1038,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 		case 7:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
-				.y = fishy->position.y + 30.0f,
+				.y = fishy->position.y - 20.0f,
 				.width = 60.0f,
 				.height = 1.0f
 			};
