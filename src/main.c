@@ -5,8 +5,9 @@
 #include <stdio.h> 
 
 // TODO: 
+// maybe add roguelike powers ?? 
 // if falling velocity -> allow bug jumping
-// add little hearts you can collect to restore health
+// add little hearts you can collect to restore health have it spin around or float up and down
 // scoring is a MESS atm
 // use the statuses instead of various booleans to clean up structs a bit??? might be a shit idea
 // cooldown on bug spit, allow bursts of three bugs
@@ -73,11 +74,11 @@ typedef struct Frog {
 typedef struct Bug{	
 	Texture2D texture;
 	Rectangle position;
-	Rectangle hitbox;
-	Rectangle previousPosition;	
+	Rectangle hitbox;		
 	Direction direction;
 	Vector2 velocity;
 	Vector2 targetPosition;
+	Vector2 previousPosition;
 	Vector2 spawnPosition;
 	Vector2 desiredVelocity;
 	char* type;	
@@ -114,6 +115,7 @@ typedef struct Lilypad{
 	int frame;
 	bool isActive;
 	bool hasFishTrap;
+	bool hasHeart;
 } Lilypad;
 
 typedef struct Fish{
@@ -128,6 +130,14 @@ typedef struct Fish{
 	bool isActive;
 	bool isAttacking;
 } Fish;
+
+typedef struct Heart{
+	Texture2D texture;
+	Rectangle position;
+	Rectangle hitbox;
+	int frame;
+	bool isActive;
+} Heart;
 
 // gravity frog
 void apply_gravity(Frog *froggy) {	
@@ -155,7 +165,7 @@ void jump_animation(Frog *froggy, int maxFrames, float deltaTime, float frameDur
 	if (froggy->jumpTimer <= 0.0f) {
 		froggy->jumpTimer = 0.0f; 
 
-		// reset jump status
+		// TODO: set this to false when colliding with a lilypad instead
 		froggy->isJumping = false;
 
 		// resting frog texture
@@ -1071,6 +1081,20 @@ void deactivate_fish(Fish *fishy, Frog *froggy, float deltaTime) {
 			fishy->attackTimer = 0.0f; 
 		}
 	}
+}
+
+void spawn_healing_heart(Heart *hearty, Texture2D heart_texture) {
+	hearty->texture = heart_texture;
+
+	hearty->position = (Rectangle){0,0,0,0}; // TODO: spawn on random lilypad -- NEEDS to be quite rare.
+	hearty->frame = 0;
+	hearty->hitbox = (Rectangle){
+		hearty->position.x,
+		hearty->position.y,
+		12.0,
+		12.0
+	};
+	hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
 }
 
 
