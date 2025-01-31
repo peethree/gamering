@@ -49,7 +49,7 @@ typedef struct Frog {
     Rectangle tongue;
     Rectangle tongueHitbox;
     Vector2 velocity;
-    Vector2 mouthPosition;
+    Rectangle mouthPosition;
     float tongueTimer;
     float attackDuration;
     float tongueAngle;
@@ -100,7 +100,7 @@ typedef struct Bug{
 typedef struct Bugspit{
 	Texture2D texture;
 	Rectangle hitbox;
-	Vector2 position;
+	Rectangle position;
 	Vector2 velocity;
 	Status status;
 	float angle;
@@ -335,7 +335,7 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 }
 
 // use the eaten bugs as ammo to kill wasps
-void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D mosquito_texture, int *activeSpit, Bugspit *spitties) {	
+void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D bugspit_texture, int *activeSpit, Bugspit *spitties) {	
 	if (froggy->bugsEaten > 0 && *activeSpit < FROGGY_MAX_BUG_SPIT && froggy->status == ALIVE) {
 		if (froggy->isShooting) {		
 			// swap direction based on mouse cursor position compared to the frog	
@@ -351,7 +351,7 @@ void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D 
 			// TODO: fix the texture, is now 2 frames, maybe make frumbled up sticky bug
 			spitties[*activeSpit] = (Bugspit){
 				.position = froggy->mouthPosition,
-				.texture = mosquito_texture,
+				.texture = bugspit_texture,
 				.isActive = true,
 				.velocity = (Vector2){
 					spitDirection.x * FROGGY_BUG_SPIT_SPEED,
@@ -437,7 +437,7 @@ void frog_mouth_position(Frog *froggy) {
 	}
 }
  
-void frog_attacks(Frog *froggy, float deltaTime, Camera2D camera, Texture2D mosquito_texture, int *activeSpit, Bugspit *spitties) {	
+void frog_attacks(Frog *froggy, float deltaTime, Camera2D camera, Texture2D bugspit_texture, int *activeSpit, Bugspit *spitties) {	
 	// despawn tongue when froggy dies
 	if (froggy->status == DEAD) {
 		froggy->isAttacking = false;
@@ -469,33 +469,8 @@ void frog_attacks(Frog *froggy, float deltaTime, Camera2D camera, Texture2D mosq
 	if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) && !froggy->isAttacking && !froggy->isShooting) {
 		froggy->isShooting = true;
 	}
-	spit_bug(froggy, angle, cameraMousePosition, mosquito_texture, activeSpit, spitties);
+	spit_bug(froggy, angle, cameraMousePosition, bugspit_texture, activeSpit, spitties);
 	froggy->isShooting = false;
-}
-
-
-void draw_mosquito_spit(Frog *froggy, Texture2D mosquito_texture) {
-	// TODO: fill in source / dest / rotation etc
-	if (froggy->isShooting) {
-		DrawTexturePro(
-			mosquito_texture,			
-			(Rectangle){ //source
-				0,
-				0,
-				0,
-				0
-			},			
-			(Rectangle){ //dest
-				0,
-				0,
-				0,
-				0
-			},
-			(Vector2){ 0, 0 }, //origin
-			0, // rotation
-			RAYWHITE
-		);
-	}
 }
 
 void draw_tongue(Frog *froggy) {
@@ -647,8 +622,8 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
     if (froggy->status == ALIVE && bug->isEaten && froggy->tongueTimer >= 0.5 * FROGGY_TONGUE_TIMER) {      
 		
         // direction vector        
-        float dx = froggy->position.x - bug->position.x;
-        float dy = froggy->position.y - bug->position.y;         	
+        float dx = froggy->mouthPosition.x - (bug->position.x + bug->texture.width / 4);
+        float dy = froggy->mouthPosition.y - (bug->position.y + bug->texture.height / 2);         	
 
         // movement amount this frame
         float moveAmount = FROGGY_TONGUE_BUG_PULL_SPEED * deltaTime;
@@ -658,9 +633,9 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
         if (distance > 0) {
             // normalize direction, move
             bug->position.x += (dx / distance) * moveAmount;
-            bug->position.y += (dy / distance) * moveAmount + 4.0f;
+            bug->position.y += (dy / distance) * moveAmount;
         } else {
-			bug->position = froggy->position;
+			bug->position = froggy->mouthPosition;
 		}	
 
 		// increase in size from eating bug
@@ -1097,7 +1072,6 @@ void spawn_healing_heart(Heart *hearty, Texture2D heart_texture) {
 	hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
 }
 
-
 int get_highscore() {    
     int highscore = 0;
 
@@ -1186,6 +1160,7 @@ int main () {
 	Texture2D mosquito_texture = LoadTexture("bug.png");
 	Texture2D wasp_texture = LoadTexture("WASP.png");
 	Texture2D fish_texture = LoadTexture("fish.png");
+	Texture2D bugspit_texture = LoadTexture("bugspit.png");
 
 	// mosquito (only 2 frames for directions)
 	const float frameWidthBug = (float)(mosquito_texture.width / 2);
@@ -1461,7 +1436,7 @@ int main () {
 		for (int i = 0; i < activeSpit; i++) {
 			if (!spitties[i].isActive) continue;
 
-			draw_spit(&spitties[i]);
+			draw_spit(&spitties[i]);			
 		}
 
 		// draw fish
@@ -1579,6 +1554,8 @@ int main () {
 	UnloadTexture(frog_texture);
 	UnloadTexture(mosquito_texture);	
 	UnloadTexture(lilypad_texture);
+	UnloadTexture(fish_texture);
+	UnloadTexture(bugspit_texture);
 
 	// destroy the window and cleanup the OpenGL context
 	CloseWindow();
