@@ -19,6 +19,9 @@
 // fish
 #define MAX_FISH 10
 
+// heart
+#define MAX_HEARTS 1
+
 // lilly pads
 #define MAX_LILLYPADS 1000
 #define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
@@ -29,7 +32,7 @@
 #define FROGGY_JUMP_VELOCITY_Y 1300.0
 #define FROGGY_JUMP_VELOCITY_X 380.0
 #define FROGGY_BUMP_VELOCITY_Y 825
-#define FROGGY_BUMP_VELOCITY_X 380.0
+// #define FROGGY_BUMP_VELOCITY_X 380.0
 #define FROGGY_FALL_VELOCITY 450.0 // if this value is changed, check lilypad collision
 #define FROGGY_TONGUE_LENGTH 480.0f 
 #define FROGGY_ATTACK_DURATION 0.6f

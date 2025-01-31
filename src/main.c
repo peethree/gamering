@@ -135,7 +135,6 @@ typedef struct Heart{
 	Texture2D texture;
 	Rectangle position;
 	Rectangle hitbox;
-	int frame;
 	bool isActive;
 } Heart;
 
@@ -630,7 +629,7 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
         float distance = sqrtf(dx * dx + dy * dy);
 
 		// move bug toward froggy
-        if (distance > 0) {
+        if (distance > 5.0) {
             // normalize direction, move
             bug->position.x += (dx / distance) * moveAmount;
             bug->position.y += (dy / distance) * moveAmount;
@@ -648,7 +647,6 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
 }
 
 void hitbox_bug(Bug *bug) {
-	// hitboxes need to be updated every loop	
 	// mosquito hitbox
 	if (bug->type == "mosquito") {	
 		bug->hitbox = (Rectangle){
@@ -695,25 +693,23 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 			// TODO: instead of bump down, slow velocity
 			// froggy->velocity.y *= 0.50;
 
-			// TODO: get horizontal bump to work // add a graceperiod so bug damage is more consistent
+			// TODO: horizontal bumps do not work
 			// froggy is further left than bug
-			if (froggy->position.x < bug->position.x) {
-				froggy->velocity.x = -FROGGY_BUMP_VELOCITY_X;
-			} 
+			// if (froggy->position.x < bug->position.x) {
+			// 	froggy->velocity.x = -FROGGY_BUMP_VELOCITY_X;
+			// } 
 
-			// froggy is further right
-			if (froggy->position.x > bug->position.x) {
-				froggy->velocity.x = FROGGY_BUMP_VELOCITY_X;
-			} 
+			// // froggy is further right
+			// if (froggy->position.x > bug->position.x) {
+			// 	froggy->velocity.x = FROGGY_BUMP_VELOCITY_X;
+			// } 
 
 		// froggy is on TOP wew!!!!	
 		} else if (froggy->position.y < bug->position.y && (froggy->isJumping || froggy->velocity.y <= FROGGY_FALL_VELOCITY)) {
 			// allow the frog to bounce off bug for a boost and kill the bug						
 			if (bug->status == ALIVE) {			
 				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.65;	
-				bug->status = DEAD;	
-				// TODO: fix this
-				// bug_jump_death(bug, deltaTime);
+				bug->status = DEAD;		
 				froggy->score++;		
 			}
 		} 
@@ -731,7 +727,7 @@ void froggy_death(Frog *froggy) {
 }
 
 void bug_death(Bug *bug) {
-		if (bug->health <= 0) {		
+	if (bug->health <= 0) {		
 		bug->health = 0;
 		bug->status = DEAD;				
 	}
@@ -835,7 +831,6 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {
         mosquito->direction = LEFT;         
     }
 
-	// mosquito->direction = GetRandomValue(true, false) ? LEFT : RIGHT;
     mosquito->frame = 0;
 	mosquito->status = ALIVE;
 	mosquito->isActive = true;
@@ -943,7 +938,7 @@ void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePa
 	fishy->frame = 0;
 }
 
-// trigger fish attack 
+// trigger the fish by stepping on its initial hitbox 
 void activate_fish(Fish *fishy, Frog *froggy) {
 	if (!fishy->isAttacking) {
 		// fish hitbox 
@@ -960,7 +955,6 @@ void activate_fish(Fish *fishy, Frog *froggy) {
 	}
 }
 
-// TODO: hitboxes are growing downward instead of upward
 // after fish has been activated, change hitbox based on the frame
 void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 	switch(fishy->frame) {
@@ -1034,7 +1028,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 
 	if (fishy->isAttacking && fishy->frame > 1) {
 		if (CheckCollisionRecs(fishy->hitbox, froggy->hitbox)) {
-			froggy->health -= 0.05;
+			froggy->health -= 0.15;
 		}
 	}
 }
@@ -1060,9 +1054,8 @@ void deactivate_fish(Fish *fishy, Frog *froggy, float deltaTime) {
 
 void spawn_healing_heart(Heart *hearty, Texture2D heart_texture) {
 	hearty->texture = heart_texture;
-
-	hearty->position = (Rectangle){0,0,0,0}; // TODO: spawn on random lilypad -- NEEDS to be quite rare.
-	hearty->frame = 0;
+	hearty->position = (Rectangle){250,400,0,0}; // TODO: spawn on random lilypad above the frog -- NEEDS to be quite rare/ can be on a random timer
+	// hearty->frame = 0;
 	hearty->hitbox = (Rectangle){
 		hearty->position.x,
 		hearty->position.y,
@@ -1070,6 +1063,29 @@ void spawn_healing_heart(Heart *hearty, Texture2D heart_texture) {
 		12.0
 	};
 	hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
+}
+
+void animate_heart(Heart *hearty, float deltaTime) {
+	// bounce up and down
+
+	// move y posish smoothly
+}
+
+void draw_heart(Heart *hearty) {
+	DrawTextureRec(
+		hearty->texture,
+		(Rectangle){
+			0,
+			0,
+			hearty->texture.width,
+			hearty->texture.height
+		},
+		(Vector2){
+			hearty->position.x,
+			hearty->position.y
+		},
+		RAYWHITE
+	);
 }
 
 int get_highscore() {    
@@ -1161,6 +1177,7 @@ int main () {
 	Texture2D wasp_texture = LoadTexture("WASP.png");
 	Texture2D fish_texture = LoadTexture("fish.png");
 	Texture2D bugspit_texture = LoadTexture("bugspit.png");
+	Texture2D heart_texture = LoadTexture("heart.png");
 
 	// mosquito (only 2 frames for directions)
 	const float frameWidthBug = (float)(mosquito_texture.width / 2);
@@ -1179,12 +1196,14 @@ int main () {
 	Fish fishies[MAX_FISH];
 	Bugspit spitties[FROGGY_MAX_BUG_SPIT];
 	Lilypad pads[MAX_LILLYPADS];
+	Heart hearties[MAX_HEARTS];
 
 	int activeMosquitoes = 0;	
 	int activeWasps = 0;	
 	int activeFish = 0;
 	int activeSpit = 0;
 	int activePads = 0;
+	int activeHearts = 0;
 
 	// bug spawntimer
 	float mosquitoSpawnTimer = MOSQUITO_SPAWN_TIMER;		
@@ -1198,6 +1217,8 @@ int main () {
 	
 	float nextLilypadSpawn = 0.0f;	
 
+	// TODO: heart spawn timer
+
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
@@ -1205,15 +1226,14 @@ int main () {
 		float deltaTime = GetFrameTime();
 
 		mosquitoSpawnTimer += deltaTime;
+		waspSpawnTimer += deltaTime;
 
 		// spawn mosquitoes 
 		if (mosquitoSpawnTimer >= MOSQUITO_SPAWN_INTERVAL && activeMosquitoes < MAX_MOSQUITOES) {
 			spawn_mosquito(&mosquitoes[activeMosquitoes], &froggy, mosquito_texture);
 			activeMosquitoes++;
 			mosquitoSpawnTimer = 0.0f;	
-		}
-
-		waspSpawnTimer += deltaTime;
+		}		
 
 		// spawn wasp
 		if (waspSpawnTimer >= WASP_SPAWN_INTERVAL && activeWasps < MAX_WASPS) {
@@ -1229,7 +1249,6 @@ int main () {
 				activePads++;
 			}
 		}
-
 
 		// TODO: this needs looked at still
 		// keep spawning lilypads, this time offscreen
@@ -1247,14 +1266,18 @@ int main () {
 			activeFish++;		
 		}
 
-		hitbox_frog(&froggy);
-		
+		// spawn hearts
+		if (activeHearts < MAX_HEARTS) {
+			spawn_healing_heart(&hearties[activeHearts], heart_texture);
+			activeHearts++;
+		}
+
+		hitbox_frog(&froggy);		
 		if (froggy.status == ALIVE) {									
 			frog_baby_jump(&froggy, maxFrames, deltaTime);
 			frog_big_jump(&froggy, maxFrames, deltaTime);
 			move_frog(&froggy);						
 		}
-
 		frog_mouth_position(&froggy);
 		// lots of function params, kind of N A S T Y 
 		frog_attacks(&froggy, deltaTime, camera, mosquito_texture, &activeSpit, spitties);	
@@ -1275,11 +1298,22 @@ int main () {
 			spit_velocity(&spitties[i], deltaTime);
 			deactivate_spit(&spitties[i], &froggy, &activeSpit);
 
-
 			if (spitties[i].isActive) {
 				spitties[activeSpitAfterLoop++] = spitties[i];
 			}
 		}
+		activeSpit = activeSpitAfterLoop;
+
+		// update hearts
+		int activeHeartsAfterLoop = 0;
+		for (int i = 0; i < activeHearts; i++) {
+			// DO HEART STUFF
+			// spawn healinh hearts
+			if (hearties[i].isActive) {
+				hearties[activeHeartsAfterLoop++] = hearties[i];
+			}
+		}
+		activeHearts = activeHeartsAfterLoop;
 
 		// update lillypads
 		int activePadsAfterLoop = 0;		
@@ -1435,8 +1469,12 @@ int main () {
 		// draw bug spit
 		for (int i = 0; i < activeSpit; i++) {
 			if (!spitties[i].isActive) continue;
-
 			draw_spit(&spitties[i]);			
+		}
+
+		// draw hearts 
+		for (int i = 0; i < activeHearts; i++) {
+			draw_heart(&hearties[i]);
 		}
 
 		// draw fish
@@ -1510,9 +1548,9 @@ int main () {
 
 		EndMode2D();
 		
-		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, WHITE);
+		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, RED);
 		DrawText(TextFormat("Score: %d", froggy.score), 500, 40, 40, WHITE);
-		DrawText(TextFormat("Highscore: %d", highscore), 500, 80, 40, WHITE);
+		DrawText(TextFormat("Highscore: %d", highscore), 500, 80, 40, YELLOW);
 
 		// debug 
 		DrawText(TextFormat("Position: %.2f", froggy.position.y), 10, 10, 20, WHITE);
@@ -1521,10 +1559,10 @@ int main () {
 		DrawText(TextFormat("mosquitoes: %d", activeMosquitoes), 10, 100, 20, WHITE);
 		DrawText(TextFormat("next_spawn: %.2f", nextLilypadSpawn), 10, 130, 20, WHITE);
 		DrawText(TextFormat("acivebugs_after_loop: %d", activeMosquitoesAfterLoop), 10, 160, 20, WHITE);
-		DrawText(TextFormat("frog tongue height: %.2f", froggy.tongue.height), 10, 190, 20, WHITE);
-		DrawText(TextFormat("frog tongue width: %.2f", froggy.tongue.width), 10, 220, 20, WHITE);
-		DrawText(TextFormat("frog tongue x: %.2f", froggy.tongue.x), 10, 250, 20, WHITE);
-		DrawText(TextFormat("frog tongue y: %.2f", froggy.tongue.y), 10, 280, 20, WHITE);
+		// DrawText(TextFormat("frog tongue height: %.2f", froggy.tongue.height), 10, 190, 20, WHITE);
+		// DrawText(TextFormat("frog tongue width: %.2f", froggy.tongue.width), 10, 220, 20, WHITE);
+		// DrawText(TextFormat("frog tongue x: %.2f", froggy.tongue.x), 10, 250, 20, WHITE);
+		// DrawText(TextFormat("frog tongue y: %.2f", froggy.tongue.y), 10, 280, 20, WHITE);
 		DrawText(TextFormat("acive wasps: %d", activeWasps), 10, 310, 20, WHITE);
 		DrawText(TextFormat("tonguetimer: %.2f", froggy.tongueTimer), 10, 340, 20, WHITE);
 		DrawText(TextFormat("attackduration: %.2f", froggy.attackDuration), 10, 370, 20, WHITE);
@@ -1534,9 +1572,10 @@ int main () {
 		DrawText(TextFormat("isShooting: %d", froggy.isShooting), 10, 490, 20, WHITE);
 		DrawText(TextFormat("activeSpit: %d", activeSpit), 10, 520, 20, WHITE);
 		DrawText(TextFormat("jumpheight: %.2f", froggy.jumpHeight), 10, 550, 20, WHITE);
+		DrawText(TextFormat("activeHearts: %d", activeHearts), 10, 580, 20, WHITE);
 
 
-		
+		// :-C		
 		if (froggy.status == DEAD) {
 			DrawText("FROGGY HAS PERISHED", 400, 400, 42, RED);
 		}
