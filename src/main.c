@@ -5,6 +5,7 @@
 #include <stdio.h> 
 
 // TODO: 
+// delay the tongue swipe speed
 // maybe add roguelike powers ?? 
 // if falling velocity -> allow bug jumping
 // add little hearts you can collect to restore health have it spin around or float up and down
@@ -487,6 +488,12 @@ void draw_tongue(Frog *froggy) {
 		// 	froggy->tongueAngle,
 		// 	WHITE
 		// );
+	}
+}
+
+void frog_prevent_overheal(Frog *froggy) {
+	if (froggy->health > 100.0) {
+		froggy->health = 100.0;
 	}
 }
 
@@ -1052,17 +1059,46 @@ void deactivate_fish(Fish *fishy, Frog *froggy, float deltaTime) {
 	}
 }
 
-void spawn_healing_heart(Heart *hearty, Texture2D heart_texture) {
+void spawn_healing_heart(Heart *hearty, Texture2D heart_texture, Lilypad *pads, int activePads) {
+	// TODO: put on a cooldown
 	hearty->texture = heart_texture;
-	hearty->position = (Rectangle){250,400,0,0}; // TODO: spawn on random lilypad above the frog -- NEEDS to be quite rare/ can be on a random timer
+	// NEEDS to be quite rare/ can be on a random timer
 	// hearty->frame = 0;
+
+	// spawn at random lily location
+	int randomValue = GetRandomValue(0, activePads - 1);
+
+	hearty->position = pads[randomValue].position;	
 	hearty->hitbox = (Rectangle){
 		hearty->position.x,
 		hearty->position.y,
-		12.0,
-		12.0
+		16.0,
+		16.0
 	};
+
 	hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
+}
+
+void deactivate_heart(Heart *hearty, Frog *froggy) {
+	// if the heart is no longer reachable (froggy too far removed)
+	if (hearty->isActive && (hearty->position.y > froggy->position.y + 1500.0f)) {
+		hearty->isActive = false;		
+	}
+
+	// if the frog has interacted with it 
+	if (CheckCollisionRecs(froggy->hitbox, hearty->hitbox)) {
+		hearty->isActive = false;
+		froggy->health += 25.0;
+	}
+	if (CheckCollisionRecs(froggy->tongueHitbox, hearty->hitbox)) {
+		hearty->isActive = false;
+		froggy->health += 25.0;
+	}
+
+	// // if the pad it spawned on is deactivated
+	// if (!pad->isActive) {
+	// 	hearty->isActive = false;
+	// }
 }
 
 void animate_heart(Heart *hearty, float deltaTime) {
@@ -1268,7 +1304,7 @@ int main () {
 
 		// spawn hearts
 		if (activeHearts < MAX_HEARTS) {
-			spawn_healing_heart(&hearties[activeHearts], heart_texture);
+			spawn_healing_heart(&hearties[activeHearts], heart_texture, pads, activePads);
 			activeHearts++;
 		}
 
@@ -1281,6 +1317,7 @@ int main () {
 		frog_mouth_position(&froggy);
 		// lots of function params, kind of N A S T Y 
 		frog_attacks(&froggy, deltaTime, camera, mosquito_texture, &activeSpit, spitties);	
+		frog_prevent_overheal(&froggy);
 		screen_flip(&froggy);
 		apply_velocity(&froggy, deltaTime);	
 		apply_gravity(&froggy);
@@ -1307,8 +1344,8 @@ int main () {
 		// update hearts
 		int activeHeartsAfterLoop = 0;
 		for (int i = 0; i < activeHearts; i++) {
-			// DO HEART STUFF
-			// spawn healinh hearts
+			deactivate_heart(&hearties[i], &froggy);
+
 			if (hearties[i].isActive) {
 				hearties[activeHeartsAfterLoop++] = hearties[i];
 			}
@@ -1595,6 +1632,7 @@ int main () {
 	UnloadTexture(lilypad_texture);
 	UnloadTexture(fish_texture);
 	UnloadTexture(bugspit_texture);
+	UnloadTexture(heart_texture);
 
 	// destroy the window and cleanup the OpenGL context
 	CloseWindow();
