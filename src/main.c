@@ -5,6 +5,7 @@
 #include <stdio.h> 
 
 // TODO: 
+// when frog grows in size hitboxes need to grow with him
 // delay the tongue swipe speed
 // maybe add roguelike powers ?? 
 // if falling velocity -> allow bug jumping
@@ -137,6 +138,7 @@ typedef struct Heart{
 	Rectangle position;
 	Rectangle hitbox;
 	bool isActive;
+	bool isEaten;
 } Heart;
 
 // gravity frog
@@ -266,6 +268,9 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 	if (froggy->isAttacking) {
         froggy->tongueTimer += deltaTime;
         float progress;
+		
+		//
+		
 
 		// attack animation
         // tongue extends
@@ -288,7 +293,7 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 		// turn frog in direction of the mouseclick, added deadzone		
         froggy->direction = (cameraMousePosition.x < froggy->mouthPosition.x + 10.0f) ? LEFT : RIGHT;		
 
-		// tongue rectangle
+		// tongue rectangle for drawing
         froggy->tongue = (Rectangle){
             froggy->mouthPosition.x,
             froggy->mouthPosition.y,
@@ -301,25 +306,52 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 		
         float tongueWidth = FROGGY_TONGUE_WIDTH * froggy->size;
 		float halfWidth = tongueWidth / 2.0f;
-        
-        // hitbox corners
-        Vector2 topLeft = {
-            froggy->mouthPosition.x - halfWidth * sinf(angle),
-            froggy->mouthPosition.y + halfWidth * cosf(angle)
-        };        
-        Vector2 bottomRight = {
-            tongueEndX + halfWidth * sinf(angle),
-            tongueEndY - halfWidth * cosf(angle)
+
+		// corners of the froggy tongue       
+		Vector2 corners[4];
+        float cosAngle = cosf(angle);
+        float sinAngle = sinf(angle);
+
+        // offset vectors for the four corners
+        Vector2 widthOffset = {
+            halfWidth * sinAngle,
+            -halfWidth * cosAngle
         };
-        
-		// taper hitbox near the end of its length
-		float currentHitboxWidth = tongueWidth * (1.0f - (currentLength / (FROGGY_TONGUE_LENGTH)) * 0.5f); 
-        // ceate hitbox as a rectangle that encompasses the rotated tongue
+
+        // corner coordinates
+        corners[0] = (Vector2){ 
+            froggy->mouthPosition.x - widthOffset.x, 
+            froggy->mouthPosition.y - widthOffset.y 
+        };
+        corners[1] = (Vector2){ 
+            froggy->mouthPosition.x + widthOffset.x, 
+            froggy->mouthPosition.y + widthOffset.y 
+        };
+        corners[2] = (Vector2){ 
+            tongueEndX + widthOffset.x, 
+            tongueEndY + widthOffset.y 
+        };
+        corners[3] = (Vector2){ 
+            tongueEndX - widthOffset.x, 
+            tongueEndY - widthOffset.y 
+        };
+
+        // bounding box of the corners
+        float minX = corners[0].x, maxX = corners[0].x;
+        float minY = corners[0].y, maxY = corners[0].y;
+        for (int i = 1; i < 4; i++) {
+            minX = fminf(minX, corners[i].x);
+            maxX = fmaxf(maxX, corners[i].x);
+            minY = fminf(minY, corners[i].y);
+            maxY = fmaxf(maxY, corners[i].y);
+        }
+
+        // hitbox
         froggy->tongueHitbox = (Rectangle){
-            fminf(topLeft.x, bottomRight.x),
-            fminf(topLeft.y, bottomRight.y),
-            fabsf(tongueEndX - froggy->mouthPosition.x) + halfWidth,
-            currentHitboxWidth
+            minX,
+            minY,
+            maxX - minX,
+            maxY - minY
         };
 
         // reset hitbox when attack is over.
@@ -427,6 +459,7 @@ void deactivate_spit(Bugspit *spitty, Frog *froggy, int *activeSpit) {
 	}
 }
 
+// // keep track of where on the sprite the tongue should appear from
 void frog_mouth_position(Frog *froggy) {
 	if (froggy->direction == RIGHT) {				   //offsets to spawn tongue closer to mouth
 		froggy->mouthPosition.x = froggy->position.x + (7.0f * froggy->size * 1.9);
@@ -447,9 +480,6 @@ void frog_attacks(Frog *froggy, float deltaTime, Camera2D camera, Texture2D bugs
 	// keep track of cursor coordinates, translate them into camera coords for hitbox logic
 	Vector2 cursorPosition = GetMousePosition();
 	Vector2 cameraMousePosition = GetScreenToWorld2D(cursorPosition, camera);
-
-	// keep track of where on the sprite the tongue should appear from
-
 
 	// direction vectors
 	float dx = cameraMousePosition.x - froggy->mouthPosition.x;
@@ -480,8 +510,7 @@ void draw_tongue(Frog *froggy) {
 			(Vector2){0, FROGGY_TONGUE_WIDTH / 2},		
 			froggy->tongueAngle,
 			RED
-		);
-		
+		);		
 		// DrawRectanglePro(
 		// 	froggy->tongueHitbox,
 		// 	(Vector2){ 0, FROGGY_TONGUE_WIDTH },
@@ -636,7 +665,7 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
         float distance = sqrtf(dx * dx + dy * dy);
 
 		// move bug toward froggy
-        if (distance > 5.0) {
+        if (distance > 10.0) {
             // normalize direction, move
             bug->position.x += (dx / distance) * moveAmount;
             bug->position.y += (dy / distance) * moveAmount;
@@ -645,12 +674,39 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
 		}	
 
 		// increase in size from eating bug
-		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox)) {
+		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) || CheckCollisionRecs(froggy->mouthPosition, bug->hitbox)) {
 			froggy->size += 0.05;
 			bug->isActive = false;
 			froggy->bugsEaten++;
 		}	
     }
+}
+
+// collision frogtongue + heart
+void check_collision_tongue_heart(Frog *froggy, Heart *hearty) {
+	if (CheckCollisionRecs(froggy->tongueHitbox, hearty->hitbox)) {
+		hearty->isEaten = true;			
+	}
+}
+
+void froggy_eat_heart(Frog *froggy, Heart *hearty, float deltaTime) {
+	// drag the heart over to the frog by the tongue
+	if (froggy->status == ALIVE && hearty->isEaten && froggy->tongueTimer >= 0.5 * FROGGY_TONGUE_TIMER) {
+		// TODO: with improved animation width / 2 needs changed to meet the amount of frames of the sprite      
+        float dx = froggy->mouthPosition.x - (hearty->position.x + hearty->texture.width / 2);
+        float dy = froggy->mouthPosition.y - (hearty->position.y + hearty->texture.height / 2);    	
+    
+        float moveAmount = FROGGY_TONGUE_BUG_PULL_SPEED * deltaTime;
+        float distance = sqrtf(dx * dx + dy * dy);
+
+		// move heart toward froggy
+        if (distance > 3.0) {            
+            hearty->position.x += (dx / distance) * moveAmount;
+            hearty->position.y += (dy / distance) * moveAmount;
+        } else {
+			hearty->position = froggy->mouthPosition;
+		}	
+	}
 }
 
 void hitbox_bug(Bug *bug) {
@@ -1069,14 +1125,17 @@ void spawn_healing_heart(Heart *hearty, Texture2D heart_texture, Lilypad *pads, 
 	int randomValue = GetRandomValue(0, activePads - 1);
 
 	hearty->position = pads[randomValue].position;	
+	hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
+	hearty->isEaten = false;
+}
+
+void hitbox_heart(Heart *hearty) {
 	hearty->hitbox = (Rectangle){
 		hearty->position.x,
 		hearty->position.y,
 		16.0,
 		16.0
 	};
-
-	hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
 }
 
 void deactivate_heart(Heart *hearty, Frog *froggy) {
@@ -1086,11 +1145,7 @@ void deactivate_heart(Heart *hearty, Frog *froggy) {
 	}
 
 	// if the frog has interacted with it 
-	if (CheckCollisionRecs(froggy->hitbox, hearty->hitbox)) {
-		hearty->isActive = false;
-		froggy->health += 25.0;
-	}
-	if (CheckCollisionRecs(froggy->tongueHitbox, hearty->hitbox)) {
+	if (CheckCollisionRecs(froggy->hitbox, hearty->hitbox) || CheckCollisionRecs(froggy->mouthPosition, hearty->hitbox)) {
 		hearty->isActive = false;
 		froggy->health += 25.0;
 	}
@@ -1316,7 +1371,7 @@ int main () {
 		}
 		frog_mouth_position(&froggy);
 		// lots of function params, kind of N A S T Y 
-		frog_attacks(&froggy, deltaTime, camera, mosquito_texture, &activeSpit, spitties);	
+		frog_attacks(&froggy, deltaTime, camera, bugspit_texture, &activeSpit, spitties);	
 		frog_prevent_overheal(&froggy);
 		screen_flip(&froggy);
 		apply_velocity(&froggy, deltaTime);	
@@ -1344,6 +1399,9 @@ int main () {
 		// update hearts
 		int activeHeartsAfterLoop = 0;
 		for (int i = 0; i < activeHearts; i++) {
+			hitbox_heart(&hearties[i]);
+			check_collision_tongue_heart(&froggy, &hearties[i]);
+			froggy_eat_heart(&froggy, &hearties[i], deltaTime);
 			deactivate_heart(&hearties[i], &froggy);
 
 			if (hearties[i].isActive) {
