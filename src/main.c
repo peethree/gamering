@@ -9,12 +9,9 @@
 // delay the tongue swipe speed
 // maybe add roguelike powers ?? 
 // if falling velocity -> allow bug jumping
-// add little hearts you can collect to restore health have it spin around or float up and down
 // scoring is a MESS atm
 // use the statuses instead of various booleans to clean up structs a bit??? might be a shit idea
 // cooldown on bug spit, allow bursts of three bugs
-// slowdown tongue attack ?
-// move the bugs along with the tongue endpoint until the tongue's at the furthest point, then pull them back as it retracts
 // make landing on lilypads smoother ideally only interact with the pad when falling from above. keep track of y coordinate when jump was initiated?
 // use jumpheight to fix lilypad interactions as well as jumping on bugs
 // fix fish hitboxes 
@@ -49,9 +46,9 @@ typedef struct Frog {
     Rectangle position;
     Rectangle hitbox;
     Rectangle tongue;
-    Rectangle tongueHitbox;
-    Vector2 velocity;
+    Rectangle tongueHitbox;    
     Rectangle mouthPosition;
+	Vector2 velocity;
     float tongueTimer;
     float attackDuration;
     float tongueAngle;
@@ -76,7 +73,8 @@ typedef struct Frog {
 typedef struct Bug{	
 	Texture2D texture;
 	Rectangle position;
-	Rectangle hitbox;		
+	Rectangle hitbox;	
+	Rectangle caughtPosition;	
 	Direction direction;
 	Vector2 velocity;
 	Vector2 targetPosition;
@@ -93,6 +91,7 @@ typedef struct Bug{
 	float waveAmplitude;
 	float frameTimer;	
 	float health;
+	float caughtTongueLength;
 	int frame;
 	Status status;			
 	bool isActive;	
@@ -366,6 +365,17 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 	}
 }
 
+// for the first half of the tongue attack, move the mosquitoes with the tongue.
+void move_caught_bug(Bug *bug, Frog *froggy, float deltaTime) {
+    if (bug->isEaten && froggy->tongueTimer <= 0.5 * FROGGY_TONGUE_TIMER) {
+        
+        float angle = froggy->tongueAngle * DEG2RAD;
+
+        bug->position.x = froggy->mouthPosition.x + cosf(angle) * bug->caughtTongueLength;
+        bug->position.y = froggy->mouthPosition.y + sinf(angle) * bug->caughtTongueLength;
+    }
+}
+
 // use the eaten bugs as ammo to kill wasps
 void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D bugspit_texture, int *activeSpit, Bugspit *spitties) {	
 	if (froggy->bugsEaten > 0 && *activeSpit < FROGGY_MAX_BUG_SPIT && froggy->status == ALIVE) {
@@ -529,7 +539,7 @@ void frog_prevent_overheal(Frog *froggy) {
 // movement mosquito
 void move_mosquito(Bug *mosquito, float deltaTime) {	
 	
-	if (mosquito->status == ALIVE) {
+	if (mosquito->status == ALIVE && mosquito->isEaten == false) {
 		mosquito->waveAmplitude = MOSQUITO_WAVE_AMPLITUDE; 
 		mosquito->waveFrequency = MOSQUITO_WAVE_FREQUENCY; 
 		mosquito->velocity.x = MOSQUITO_VELOCITY_X; 
@@ -539,9 +549,10 @@ void move_mosquito(Bug *mosquito, float deltaTime) {
 		mosquito->position.x += (float)mosquito->direction * mosquito->velocity.x * deltaTime;
 		mosquito->position.y = mosquito->spawnPosition.y + mosquito->waveAmplitude * sinf(mosquito->waveFrequency * mosquito->angle);
 	// don't update position anymore in this func when bug is eaten
-	} else if (mosquito->isEaten) {
-		//
-		mosquito->status = DEAD;
+	
+		// mosquito->tonguetouchposition = current position
+
+		
 	// bug should fall off the screen in case of jump death
 	} else {			
 		mosquito->velocity.y = MOSQUITO_VELOCITY_DEATH_FALL; 
@@ -733,14 +744,22 @@ void hitbox_bug(Bug *bug) {
 
 void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 	// when the tongue hits a mosquito, eat it
-	if (CheckCollisionRecs(froggy->tongueHitbox, bug->hitbox) && bug->type == "mosquito") {
-		bug->status = DEAD;
-		bug->isEaten = true;		
+	if (CheckCollisionRecs(froggy->tongueHitbox, bug->hitbox) && bug->type == "mosquito" && !bug->isEaten) {
+		// bug->status = DEAD;
+		bug->isEaten = true;
+
+		// set position for where the bug was caught
+		// bug->caughtPosition.x = bug->position.x;
+		// bug->caughtPosition.y = bug->position.y;
+
+		// set current length where mosquito got caught
+		bug->caughtTongueLength = FROGGY_TONGUE_LENGTH * (froggy->tongueTimer / (froggy->attackDuration / 2));
+		// update score
 		froggy->score++;
 	}	
 	
 	// froggy bug collision
-	if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) && bug->status == ALIVE && froggy->status == ALIVE) {
+	if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) && bug->status == ALIVE && froggy->status == ALIVE && !bug->isEaten) {
 		// froggy is hitting the bug from the bottom
 		if (froggy->position.y > bug->position.y) {		
 			if (froggy->health >= 0.0) {
@@ -1430,6 +1449,7 @@ int main () {
 			hitbox_bug(&mosquitoes[i]);
 			collision_check_bugs(&froggy, &mosquitoes[i], deltaTime);
 			eat_bug(&froggy, &mosquitoes[i], deltaTime);
+			move_caught_bug(&mosquitoes[i], &froggy, deltaTime);
 
 			for (int j = 0; j < activeSpit; j++) {
 				collision_check_spit(&spitties[j], &mosquitoes[i]);
