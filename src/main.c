@@ -4,7 +4,11 @@
 #include "resource_dir.h"	
 #include <stdio.h> 
 
+
 // TODO: 
+// add something to the bottom of screen that forces upward moving, like a an angry horde of sharks idk could be anything. insta death when touched
+// add a way to move through lilypads (downward S key)
+// fix eat_bug, mosquitoes need to have the same movement as the retracting tongue.
 // when frog grows in size hitboxes need to grow with him
 // delay the tongue swipe speed
 // maybe add roguelike powers ?? 
@@ -73,8 +77,7 @@ typedef struct Frog {
 typedef struct Bug{	
 	Texture2D texture;
 	Rectangle position;
-	Rectangle hitbox;	
-	Rectangle caughtPosition;	
+	Rectangle hitbox;		
 	Direction direction;
 	Vector2 velocity;
 	Vector2 targetPosition;
@@ -267,9 +270,7 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 	if (froggy->isAttacking) {
         froggy->tongueTimer += deltaTime;
         float progress;
-		
-		//
-		
+		//		
 
 		// attack animation
         // tongue extends
@@ -306,7 +307,7 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
         float tongueWidth = FROGGY_TONGUE_WIDTH * froggy->size;
 		float halfWidth = tongueWidth / 2.0f;
 
-		// corners of the froggy tongue       
+		// corners of the froggy tongue hitbox      
 		Vector2 corners[4];
         float cosAngle = cosf(angle);
         float sinAngle = sinf(angle);
@@ -367,7 +368,7 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 
 // for the first half of the tongue attack, move the mosquitoes with the tongue.
 void move_caught_bug(Bug *bug, Frog *froggy, float deltaTime) {
-    if (bug->isEaten && froggy->tongueTimer <= 0.5 * FROGGY_TONGUE_TIMER) {
+    if (bug->isEaten && froggy->tongueTimer <= FROGGY_TONGUE_TIMER / 2) {
         
         float angle = froggy->tongueAngle * DEG2RAD;
 
@@ -390,7 +391,6 @@ void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D 
 			};			
 
 			// initialize new bug spit at activespit index
-			// TODO: fix the texture, is now 2 frames, maybe make frumbled up sticky bug
 			spitties[*activeSpit] = (Bugspit){
 				.position = froggy->mouthPosition,
 				.texture = bugspit_texture,
@@ -406,6 +406,7 @@ void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D 
 			(*activeSpit)++;	
 			// decrement bugs eaten (ammo)
 			froggy->bugsEaten--;	
+			froggy->size -= 0.10;
 		}
 	} 
 }
@@ -665,28 +666,33 @@ void bug_spit_death(Bug *bug, float deltaTime, Frog *froggy) {
 // you will eat the bugs
 void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
     // start pulling the bug toward the froggy when the tongue starts retracting
-    if (froggy->status == ALIVE && bug->isEaten && froggy->tongueTimer >= 0.5 * FROGGY_TONGUE_TIMER) {      
-		
-        // direction vector        
+    if (froggy->status == ALIVE && bug->isEaten && froggy->tongueTimer >= FROGGY_TONGUE_TIMER / 2) { 
+
+		// retraction progress
+		float progress = 1.0f - ((froggy->tongueTimer - froggy->attackDuration / 2) / (froggy->attackDuration / 2));
+
+		// update length based on retraction progress
+		float currentLength = bug->caughtTongueLength * progress;
+
+		float angle = froggy->tongueAngle * DEG2RAD;
+
+		// update bug position		
+        bug->position.x = froggy->mouthPosition.x + cosf(angle) * currentLength;
+        bug->position.y = froggy->mouthPosition.y + sinf(angle) * currentLength;		
+
+		// force bug collision at end of tongue retraction   
         float dx = froggy->mouthPosition.x - (bug->position.x + bug->texture.width / 4);
-        float dy = froggy->mouthPosition.y - (bug->position.y + bug->texture.height / 2);         	
+        float dy = froggy->mouthPosition.y - (bug->position.y + bug->texture.height / 2); 
 
-        // movement amount this frame
-        float moveAmount = FROGGY_TONGUE_BUG_PULL_SPEED * deltaTime;
-        float distance = sqrtf(dx * dx + dy * dy);
-
-		// move bug toward froggy
-        if (distance > 10.0) {
-            // normalize direction, move
-            bug->position.x += (dx / distance) * moveAmount;
-            bug->position.y += (dy / distance) * moveAmount;
-        } else {
+		float distance = sqrtf(dx * dx + dy * dy);
+	
+        if (distance < 15.0) {
 			bug->position = froggy->mouthPosition;
 		}	
 
 		// increase in size from eating bug
 		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) || CheckCollisionRecs(froggy->mouthPosition, bug->hitbox)) {
-			froggy->size += 0.05;
+			froggy->size += 0.10;
 			bug->isActive = false;
 			froggy->bugsEaten++;
 		}	
