@@ -73,6 +73,7 @@ typedef struct Frog {
     bool isShooting;
     bool isJumping;
     bool isBouncing;
+	bool dropDown;
 } Frog;
 
 typedef struct Bug{	
@@ -249,10 +250,14 @@ void move_frog(Frog *froggy) {
 }	
 
 // TODO: 
-void move_frog_down(Frog *froggy, Lilypad *pad) {
+void move_frog_down(Frog *froggy) {
 	// if frog is currently on a lilypad (colliding)
-
-	// allow downward movement, to fall through it S  key
+	if (IsKeyDown(KEY_S)) {
+		froggy->dropDown = true;
+		froggy->velocity.y = FROGGY_FALL_VELOCITY;
+	} else {
+		froggy->dropDown = false;	
+	}	
 }
 
 // allow movement from left side of the screen to right side 
@@ -717,9 +722,6 @@ void froggy_eat_heart(Frog *froggy, Heart *hearty, float deltaTime) {
 	// drag the heart over to the frog by the tongue
 	if (hearty->isEaten && froggy->tongueTimer >= FROGGY_TONGUE_TIMER / 2) { 
 
-		// retraction progress
-		// float progress = 1.0f - ((froggy->tongueTimer - froggy->attackDuration / 2) / (froggy->attackDuration / 2));
-
 		// update length based on retraction progress
 		float currentLength = hearty->caughtTongueLength * froggy->tongueProgress;
 
@@ -773,6 +775,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 		froggy->score++;
 	}	
 	
+	// TODO: this is a mess
 	// froggy bug collision
 	if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) && bug->status == ALIVE && froggy->status == ALIVE && !bug->isEaten) {
 		// froggy is hitting the bug from the bottom
@@ -897,7 +900,7 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 
 	// froggy is below the pad
 	if (froggy->position.y > pad->position.y && pad->isActive) {
-		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {									
+		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox) && !froggy->dropDown) {									
 			froggy->position.y += (pad->position.y - froggy->position.y) * 0.8f;	
 
 			// froggy is not moving up or down vertically (or affected by max gravity)
@@ -1292,7 +1295,8 @@ int main () {
 		.attackDuration = FROGGY_ATTACK_DURATION,
 		.size = 1.0,	
 		.bugsEaten = 0,
-		.isShooting = false
+		.isShooting = false,
+		.dropDown = false
 	};		
 
 	// 8 pictures on the frog sprite sheet -> 
@@ -1418,6 +1422,7 @@ int main () {
 		screen_flip(&froggy);
 		apply_velocity(&froggy, deltaTime);	
 		apply_gravity(&froggy);
+		move_frog_down(&froggy);
 		froggy_death(&froggy);
 		
 		// update highscore in current game
@@ -1712,6 +1717,8 @@ int main () {
 		DrawText(TextFormat("jumpheight: %.2f", froggy.jumpHeight), 10, 550, 20, WHITE);
 		DrawText(TextFormat("activeHearts: %d", activeHearts), 10, 580, 20, WHITE);
 		DrawText(TextFormat("tongue prog: %.2f", froggy.tongueProgress), 10, 610, 20, WHITE);
+		DrawText(TextFormat("drowdown: %d", froggy.dropDown), 10, 640, 20, WHITE);
+
 
 
 		// :-C		
