@@ -63,6 +63,7 @@ typedef struct Frog {
     float highestPosition;
     float size;
     float spitAngle;
+	float tongueProgress;
     int frame;
     int score;
     int bugsEaten;
@@ -139,6 +140,7 @@ typedef struct Heart{
 	Texture2D texture;
 	Rectangle position;
 	Rectangle hitbox;
+	float caughtTongueLength;
 	bool isActive;
 	bool isEaten;
 } Heart;
@@ -246,6 +248,13 @@ void move_frog(Frog *froggy) {
 	}
 }	
 
+// TODO: 
+void move_frog_down(Frog *froggy, Lilypad *pad) {
+	// if frog is currently on a lilypad (colliding)
+
+	// allow downward movement, to fall through it S  key
+}
+
 // allow movement from left side of the screen to right side 
 void screen_flip(Frog *froggy) {	
 	// 8 pixel grids / frames in the texture image -> divide by 8
@@ -257,7 +266,7 @@ void screen_flip(Frog *froggy) {
 }
 
 // update frog hitbox in one place
-void hitbox_frog(Frog *froggy) {	
+void hitbox_frog(Frog *froggy) {		
 	froggy->hitbox = (Rectangle){
 		.x = froggy->position.x - 20.0f,
 		.y = froggy->position.y - 20.0f,
@@ -269,21 +278,21 @@ void hitbox_frog(Frog *froggy) {
 void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMousePosition) {
 	if (froggy->isAttacking) {
         froggy->tongueTimer += deltaTime;
-        float progress;
+        // float progress;
 		//		
 
 		// attack animation
         // tongue extends
         if (froggy->tongueTimer <= froggy->attackDuration / 2) {
-            progress = froggy->tongueTimer / (froggy->attackDuration / 2);
+            froggy->tongueProgress = froggy->tongueTimer / (froggy->attackDuration / 2);
         }
         // tongue retracts
         else {
-            progress = 1.0f - ((froggy->tongueTimer - froggy->attackDuration / 2) / (froggy->attackDuration / 2));
+            froggy->tongueProgress = 1.0f - ((froggy->tongueTimer - froggy->attackDuration / 2) / (froggy->attackDuration / 2));
         }
 
         // tongue length calculation
-        float currentLength = FROGGY_TONGUE_LENGTH * progress;
+        float currentLength = FROGGY_TONGUE_LENGTH * froggy->tongueProgress;
         
         // tongue endpoint
         float tongueEndX = froggy->mouthPosition.x + cosf(angle) * currentLength;
@@ -377,6 +386,16 @@ void move_caught_bug(Bug *bug, Frog *froggy, float deltaTime) {
     }
 }
 
+void move_caught_heart(Heart *hearty, Frog *froggy, float deltaTime) {
+	if (hearty->isEaten && froggy->tongueTimer <= FROGGY_TONGUE_TIMER / 2) {
+        
+        float angle = froggy->tongueAngle * DEG2RAD;
+
+        hearty->position.x = froggy->mouthPosition.x + cosf(angle) * hearty->caughtTongueLength;
+        hearty->position.y = froggy->mouthPosition.y + sinf(angle) * hearty->caughtTongueLength;
+    }
+}
+
 // use the eaten bugs as ammo to kill wasps
 void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D bugspit_texture, int *activeSpit, Bugspit *spitties) {	
 	if (froggy->bugsEaten > 0 && *activeSpit < FROGGY_MAX_BUG_SPIT && froggy->status == ALIVE) {
@@ -406,7 +425,6 @@ void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D 
 			(*activeSpit)++;	
 			// decrement bugs eaten (ammo)
 			froggy->bugsEaten--;	
-			froggy->size -= 0.10;
 		}
 	} 
 }
@@ -441,12 +459,12 @@ void draw_spit(Bugspit *spitty) {
 		RAYWHITE);
 
 	// debug spit hitbox
-    DrawRectanglePro(
-		spitty->hitbox,
-		(Vector2){ 0, 0},
-		spitty->angle,
-		RAYWHITE
-	);
+    // DrawRectanglePro(
+	// 	spitty->hitbox,
+	// 	(Vector2){ 0, 0},
+	// 	spitty->angle,
+	// 	RAYWHITE
+	// );
 }
 
 // apply velocity to spit projectile
@@ -456,7 +474,6 @@ void spit_velocity(Bugspit *spitty, float deltaTime) {
 }
 
 // deactivate offscreen spits
-// TODO: some spits aren't deactivating
 void deactivate_spit(Bugspit *spitty, Frog *froggy, int *activeSpit) {
 	// 	clean up spits at y distance difference
 	if (spitty->isActive && (spitty->position.y > froggy->position.y + 1000.0f || spitty->position.y < froggy->position.y - 1000.0f)) {
@@ -663,16 +680,13 @@ void bug_spit_death(Bug *bug, float deltaTime, Frog *froggy) {
 	}
 }
 
+// TODO: when progress is 0, deactivate the bug and count it as eaten.
 // you will eat the bugs
 void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
     // start pulling the bug toward the froggy when the tongue starts retracting
     if (froggy->status == ALIVE && bug->isEaten && froggy->tongueTimer >= FROGGY_TONGUE_TIMER / 2) { 
-
-		// retraction progress
-		float progress = 1.0f - ((froggy->tongueTimer - froggy->attackDuration / 2) / (froggy->attackDuration / 2));
-
 		// update length based on retraction progress
-		float currentLength = bug->caughtTongueLength * progress;
+		float currentLength = bug->caughtTongueLength * froggy->tongueProgress;
 
 		float angle = froggy->tongueAngle * DEG2RAD;
 
@@ -681,14 +695,14 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
         bug->position.y = froggy->mouthPosition.y + sinf(angle) * currentLength;		
 
 		// force bug collision at end of tongue retraction   
-        float dx = froggy->mouthPosition.x - (bug->position.x + bug->texture.width / 4);
-        float dy = froggy->mouthPosition.y - (bug->position.y + bug->texture.height / 2); 
-
-		float distance = sqrtf(dx * dx + dy * dy);
-	
-        if (distance < 15.0) {
-			bug->position = froggy->mouthPosition;
-		}	
+		if (froggy->tongueProgress < EPSILON) {
+			bug->hitbox = (Rectangle){
+				froggy->hitbox.x,
+				froggy->hitbox.y,
+				300.0,
+				300.0
+			};
+		}
 
 		// increase in size from eating bug
 		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) || CheckCollisionRecs(froggy->mouthPosition, bug->hitbox)) {
@@ -699,29 +713,30 @@ void eat_bug(Frog *froggy, Bug *bug, float deltaTime) {
     }
 }
 
-// collision frogtongue + heart
-void check_collision_tongue_heart(Frog *froggy, Heart *hearty) {
-	if (CheckCollisionRecs(froggy->tongueHitbox, hearty->hitbox)) {
-		hearty->isEaten = true;			
-	}
-}
-
 void froggy_eat_heart(Frog *froggy, Heart *hearty, float deltaTime) {
 	// drag the heart over to the frog by the tongue
-	if (froggy->status == ALIVE && hearty->isEaten && froggy->tongueTimer >= 0.5 * FROGGY_TONGUE_TIMER) {
-		// TODO: with improved animation width / 2 needs changed to meet the amount of frames of the sprite      
-        float dx = froggy->mouthPosition.x - (hearty->position.x + hearty->texture.width / 2);
-        float dy = froggy->mouthPosition.y - (hearty->position.y + hearty->texture.height / 2);    	
-    
-        float moveAmount = FROGGY_TONGUE_BUG_PULL_SPEED * deltaTime;
-        float distance = sqrtf(dx * dx + dy * dy);
+	if (hearty->isEaten && froggy->tongueTimer >= FROGGY_TONGUE_TIMER / 2) { 
 
-		// move heart toward froggy
-        if (distance > 3.0) {            
-            hearty->position.x += (dx / distance) * moveAmount;
-            hearty->position.y += (dy / distance) * moveAmount;
-        } else {
-			hearty->position = froggy->mouthPosition;
+		// retraction progress
+		// float progress = 1.0f - ((froggy->tongueTimer - froggy->attackDuration / 2) / (froggy->attackDuration / 2));
+
+		// update length based on retraction progress
+		float currentLength = hearty->caughtTongueLength * froggy->tongueProgress;
+
+		float angle = froggy->tongueAngle * DEG2RAD;
+
+		// update hearty position		
+		hearty->position.x = froggy->mouthPosition.x + cosf(angle) * currentLength;
+		hearty->position.y = froggy->mouthPosition.y + sinf(angle) * currentLength;		
+
+		// force hearty collision at end of tongue retraction   
+		if (froggy->tongueProgress < EPSILON) {
+			hearty->hitbox = (Rectangle){
+				froggy->hitbox.x,
+				froggy->hitbox.y,
+				300.0,
+				300.0
+			};
 		}	
 	}
 }
@@ -751,13 +766,7 @@ void hitbox_bug(Bug *bug) {
 void collision_check_bugs(Frog *froggy, Bug *bug, float deltaTime) {
 	// when the tongue hits a mosquito, eat it
 	if (CheckCollisionRecs(froggy->tongueHitbox, bug->hitbox) && bug->type == "mosquito" && !bug->isEaten) {
-		// bug->status = DEAD;
 		bug->isEaten = true;
-
-		// set position for where the bug was caught
-		// bug->caughtPosition.x = bug->position.x;
-		// bug->caughtPosition.y = bug->position.y;
-
 		// set current length where mosquito got caught
 		bug->caughtTongueLength = FROGGY_TONGUE_LENGTH * (froggy->tongueTimer / (froggy->attackDuration / 2));
 		// update score
@@ -1163,6 +1172,14 @@ void hitbox_heart(Heart *hearty) {
 	};
 }
 
+// collision frogtongue + heart
+void check_collision_tongue_heart(Frog *froggy, Heart *hearty) {
+	if (CheckCollisionRecs(froggy->tongueHitbox, hearty->hitbox) && !hearty->isEaten) {
+		hearty->isEaten = true;	
+		hearty->caughtTongueLength = FROGGY_TONGUE_LENGTH * (froggy->tongueTimer / (froggy->attackDuration / 2));	
+	}
+}
+
 void deactivate_heart(Heart *hearty, Frog *froggy) {
 	// if the heart is no longer reachable (froggy too far removed)
 	if (hearty->isActive && (hearty->position.y > froggy->position.y + 1500.0f)) {
@@ -1170,7 +1187,7 @@ void deactivate_heart(Heart *hearty, Frog *froggy) {
 	}
 
 	// if the frog has interacted with it 
-	if (CheckCollisionRecs(froggy->hitbox, hearty->hitbox) || CheckCollisionRecs(froggy->mouthPosition, hearty->hitbox)) {
+	if (CheckCollisionRecs(froggy->hitbox, hearty->hitbox)  || CheckCollisionRecs(froggy->mouthPosition, hearty->hitbox)) {
 		hearty->isActive = false;
 		froggy->health += 25.0;
 	}
@@ -1426,6 +1443,7 @@ int main () {
 		for (int i = 0; i < activeHearts; i++) {
 			hitbox_heart(&hearties[i]);
 			check_collision_tongue_heart(&froggy, &hearties[i]);
+			move_caught_heart(&hearties[i], &froggy, deltaTime);
 			froggy_eat_heart(&froggy, &hearties[i], deltaTime);
 			deactivate_heart(&hearties[i], &froggy);
 
@@ -1479,7 +1497,6 @@ int main () {
 			move_wasp(&wasps[i], &froggy, deltaTime);
 			hitbox_bug(&wasps[i]);
 			collision_check_bugs(&froggy, &wasps[i], deltaTime);				
-			eat_bug(&froggy, &wasps[i], deltaTime);
 
 			// this works but is it slow as shit?????
 			for (int j = 0; j < activeSpit; j++) {
@@ -1616,7 +1633,7 @@ int main () {
 			);
 
 			// draw fish hitbox
-			DrawRectangleLinesEx(fishies[i].hitbox, 1, RED); 
+			// DrawRectangleLinesEx(fishies[i].hitbox, 1, RED); 
 		}
 
 		// draw the bugs
@@ -1664,7 +1681,7 @@ int main () {
 				(wasps[i].status == ALIVE) ? RAYWHITE : RED
 			);
 
-			DrawRectangleLinesEx(wasps[i].hitbox, 1, RED); 
+			// DrawRectangleLinesEx(wasps[i].hitbox, 1, RED); 
 		}
 
 		EndMode2D();
@@ -1694,6 +1711,7 @@ int main () {
 		DrawText(TextFormat("activeSpit: %d", activeSpit), 10, 520, 20, WHITE);
 		DrawText(TextFormat("jumpheight: %.2f", froggy.jumpHeight), 10, 550, 20, WHITE);
 		DrawText(TextFormat("activeHearts: %d", activeHearts), 10, 580, 20, WHITE);
+		DrawText(TextFormat("tongue prog: %.2f", froggy.tongueProgress), 10, 610, 20, WHITE);
 
 
 		// :-C		
