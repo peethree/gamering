@@ -11,17 +11,14 @@
 // when frog grows in size hitboxes need to grow with him
 // delay the tongue swipe speed
 // maybe add roguelike powers ?? 
-// if falling velocity -> allow bug jumping ??
 // scoring is a MESS atm
 // use the statuses instead of various booleans to clean up structs a bit??? might be a shit idea
-// cooldown on bug spit, allow bursts of three bugs
 // make landing on lilypads smoother ideally only interact with the pad when falling from above. keep track of y coordinate when jump was initiated?
-// use jumpheight to fix lilypad interactions as well as jumping on bug
+// use jumpheight to fix lilypad interactions as well as jumping on bug?
 // add some kind of menu when the game is over
 // add more bug movement patterns
 // add proximity based bug buzzing hehehe
 // find a better way to deal with level building
-// don't allow mid air jump
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
 
@@ -225,7 +222,6 @@ void frog_big_jump(Frog *froggy, int maxFrames, float deltaTime) {
 	const float jumpDuration = 1.4f;  
 
 	if (froggy->status == ALIVE) {
-		// jump (prevent double jumps) TODO: fix mid air jump
 		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {			
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
 			froggy->isJumping = true;
@@ -252,8 +248,9 @@ void move_frog(Frog *froggy) {
 			froggy->velocity.x = FROGGY_JUMP_VELOCITY_X;			
 		} else {
 			froggy->velocity.x = FROGGY_JUMP_VELOCITY_X;			
-		}				
+		}	
 		froggy->direction = RIGHT;
+					
 	}
 
 	if (IsKeyDown(KEY_A)) {
@@ -262,7 +259,7 @@ void move_frog(Frog *froggy) {
 		} else {
 			froggy->velocity.x = -FROGGY_JUMP_VELOCITY_X;
 		}				
-		froggy->direction = LEFT;
+		froggy->direction = LEFT;			
 	}
 }	
 
@@ -300,14 +297,13 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 	// tongue lash
 	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && !froggy->isShooting) {
         froggy->isAttacking = true;
-        froggy->tongueTimer = 0.0f;        
+        froggy->tongueTimer = 0.0f;   		
+		froggy->direction = (cameraMousePosition.x < froggy->mouthPosition.x) ? LEFT : RIGHT;     
     }	
 
 	if (froggy->isAttacking) {
         froggy->tongueTimer += deltaTime;
-        // float progress;
-		//		
-
+		
 		// attack animation
         // tongue extends
         if (froggy->tongueTimer <= froggy->attackDuration / 2) {
@@ -326,8 +322,7 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
         float tongueEndY = froggy->mouthPosition.y + sinf(angle) * currentLength;
         
         // TODO: this spazzes out the frog when aiming above it
-		// turn frog in direction of the mouseclick, added deadzone		
-        froggy->direction = (cameraMousePosition.x < froggy->mouthPosition.x + 10.0f) ? LEFT : RIGHT;		
+		// turn frog in direction of the mouseclick, added deadzone	        		
 
 		// tongue rectangle for drawing
         froggy->tongue = (Rectangle){
@@ -1360,7 +1355,7 @@ int main () {
 	
 	float nextLilypadSpawn = 0.0f;	
 
-	// TODO: heart spawn timer
+	// TODO: heart spawn timer?
 
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
