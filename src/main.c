@@ -155,6 +155,7 @@ typedef struct Duckhorde{
 	Rectangle position;
 	Rectangle hitbox;
 	float velocity;
+	float wavetime;
 	// what else?
 } Duckhorde;
 
@@ -1241,18 +1242,20 @@ void draw_heart(Heart *hearty) {
 	);
 }
 
-// TODO:
+// TODO: add some variation to the upward movement.
 void move_duckhorde(Duckhorde *duckies, float deltaTime) {		
 	duckies->position.y -= duckies->velocity * deltaTime;
 }
 
-// TODO:
+// duckies->position.y + 400.0f for WAVE positioning
+
+// TODO: fix hitbox
 void hitbox_duckhorde(Duckhorde *duckies) {
 	duckies->hitbox = (Rectangle){
-		0,
-		0,
-		0,
-		0
+		.x = duckies->position.x,
+		.y = duckies->position.y + 200.0f,
+		.width = 1280.0f,
+		.height = 200.0f
 	};
 }
 
@@ -1278,6 +1281,29 @@ void draw_duckhorde(Duckhorde *duckies) {
 		0.0f,  
 		RAYWHITE  
 	);
+
+	// draw duckhorde hitbox
+	// DrawRectangleLinesEx(duckies->hitbox, 3, RED); 
+}
+
+// TODO:
+void froggy_duckhorde_collision(Frog *froggy, Duckhorde *duckies){
+	//
+}
+
+// wave border below the ducks
+void draw_duckhorde_surfline(Duckhorde *duckies, float deltaTime){
+	float screenwidth = GetScreenWidth();
+	float wavelength = DUCKHORDE_WAVELENGTH;
+	float amplitude = DUCKHORDE_WAVE_AMPLITUDE;
+
+	duckies->wavetime += deltaTime;
+
+	// draw a bunch of circles to simulate a wave, thx ai overlords
+	for (int x = 0; x < screenwidth; x++) {
+		float y = (duckies->position.y + 400.0f) + sinf((x + duckies->wavetime * 100) * (2 * PI / wavelength)) * amplitude;
+		DrawCircle(x, (int)y, 3, DARKBLUE);  
+	}
 }
 
 int get_highscore() {    
@@ -1367,7 +1393,8 @@ int main () {
 			.width = duckhorde_texture.width,
 			.height= duckhorde_texture.height
 			},
-		.velocity = DUCKHORDE_UPWARD_VELOCITY	
+		.velocity = DUCKHORDE_UPWARD_VELOCITY,
+		.wavetime = 0.0
 	};
 
 	// 8 pictures on the frog sprite sheet -> 
@@ -1500,6 +1527,7 @@ int main () {
 		froggy_death(&froggy);
 
 		// duckhorde updates
+		hitbox_duckhorde(&duckies);
 		move_duckhorde(&duckies, deltaTime);
 		
 		// update highscore in current game
@@ -1688,6 +1716,7 @@ int main () {
 
 		// draw duckhorde
 		draw_duckhorde(&duckies);
+		draw_duckhorde_surfline(&duckies, deltaTime);
 
 		// draw bug spit
 		for (int i = 0; i < activeSpit; i++) {
