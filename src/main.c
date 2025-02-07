@@ -6,7 +6,8 @@
 
 
 // TODO: 
-// add something to the bottom of screen that forces upward moving, like a an angry horde of sharks idk could be anything. insta death when touched
+// instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
+// add something to the bottom of screen that forces upward movement, like a an angry horde of sharks idk could be anything. insta death when touched
 // when frog grows in size hitboxes need to grow with him
 // delay the tongue swipe speed
 // maybe add roguelike powers ?? 
@@ -15,14 +16,12 @@
 // use the statuses instead of various booleans to clean up structs a bit??? might be a shit idea
 // cooldown on bug spit, allow bursts of three bugs
 // make landing on lilypads smoother ideally only interact with the pad when falling from above. keep track of y coordinate when jump was initiated?
-// use jumpheight to fix lilypad interactions as well as jumping on bugs
-// fix fish hitboxes 
+// use jumpheight to fix lilypad interactions as well as jumping on bug
 // add some kind of menu when the game is over
 // add more bug movement patterns
 // add proximity based bug buzzing hehehe
 // find a better way to deal with level building
 // don't allow mid air jump
-// tongue hitbox very inaccurate when froggy y pos is higher (smaller) than bug y pos
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
 
@@ -153,36 +152,55 @@ void apply_gravity(Frog *froggy) {
 	}
 }
 
-void jump_animation(Frog *froggy, int maxFrames, float deltaTime, float frameDuration) {
-	if (froggy->isJumping) {			
-		froggy->frameTimer += deltaTime;
+// void jump_animation(Frog *froggy, int maxFrames, float deltaTime, float frameDuration) {
+// 	if (froggy->isJumping) {			
+// 		froggy->frameTimer += deltaTime;
 		
-		if (froggy->frameTimer >= frameDuration) {
-			froggy->frameTimer = 0.0f;
-			froggy->frame++;
-			// cycling frames, result being jump animation
-			froggy->frame %= maxFrames; 
-		}	
-	}
+// 		if (froggy->frameTimer >= frameDuration) {
+// 			froggy->frameTimer = 0.0f;
+// 			froggy->frame++;
+// 			// cycling frames, result being jump animation
+// 			froggy->frame %= maxFrames; 
+// 		}	
+// 	}
 
-	// countdown jumptimer to 0
-	froggy->jumpTimer -= deltaTime;
+// 	// countdown jumptimer to 0
+// 	froggy->jumpTimer -= deltaTime;
 
-	if (froggy->jumpTimer <= 0.0f) {
-		froggy->jumpTimer = 0.0f; 
+// 	if (froggy->jumpTimer <= 0.0f) {
+// 		froggy->jumpTimer = 0.0f; 		
+// 		froggy->isJumping = false;
+// 		// resting frog texture
+// 		froggy->frame = 0;       
+// 	}
+// }
 
-		// TODO: set this to false when colliding with a lilypad instead
+void jump_animation(Frog *froggy, int maxFrames, float deltaTime, float frameDuration) {
+    if (froggy->isJumping) {
+        froggy->frameTimer += deltaTime;
+        
+        if (froggy->frameTimer >= frameDuration) {
+            froggy->frameTimer = 0.0f;
+			// update frames for animation
+            froggy->frame++;
+            
+            // upon reaching last frame, resting frame
+            if (froggy->frame >= maxFrames) { 
+                froggy->frame = 0;  
+            }
+        }
+    }
+}
+
+void frog_reset_jumpstatus(Frog *froggy) {
+	// if frog is at the starting position
+	if (froggy->position.y >= (float)GetScreenHeight() - 50.0) {
 		froggy->isJumping = false;
-
-		// resting frog texture
-		froggy->frame = 0;       
 	}
 }
 
 // smaller jump
 void frog_baby_jump(Frog *froggy, int maxFrames, float deltaTime) {
-
-	// TODO: don't quite like the look of this animation
 	const float frameDuration = 0.10f;  
 	const float jumpDuration = 1.1f; 
 
@@ -884,29 +902,6 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 	}
 
     //TODO: frog lilypad collision is REAL nasty atm, look INTO it
-   	
-//         // if froggy is below the pad
-// 	if (froggy->position.y > pad->position.y && pad->isActive) {	
-// 		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {		
-// 			froggy->position.y = pad->hitbox.y - froggy->hitbox.height;
-// 			froggy->onPad = true;
-// 			froggy->frame = 1;
-// 			// froggy->velocity.y = 0.0f;
-// 		}
-// 	}
-//     // if froggy is above the pad
-// 	else if (froggy->position.y < pad->position.y && pad->isActive) {
-// 		if (CheckCollisionRecs(froggy->hitbox, pad->hitbox)) {
-//             froggy->position.y = pad->hitbox.y - froggy->hitbox.height; 
-//             froggy->velocity.y = 0.0f;             
-//             froggy->isJumping = false;	
-// 			froggy->onPad = true;
-//         }
-//     }
-// }
-
-	// ideally: if frog velocity is negative (meaning frog is going up, do nothing when colliding with lilypad)
-	// otherwise, catch the froggy (update the position upon collision)
 
 	// froggy is below the pad
 	if (froggy->position.y > pad->position.y && pad->isActive) {
@@ -1420,6 +1415,7 @@ int main () {
 			activeHearts++;
 		}
 
+		frog_reset_jumpstatus(&froggy);
 		hitbox_frog(&froggy);		
 		if (froggy.status == ALIVE) {									
 			frog_baby_jump(&froggy, maxFrames, deltaTime);
@@ -1472,7 +1468,7 @@ int main () {
 		// update lillypads
 		int activePadsAfterLoop = 0;		
 		for (int i = 0; i < activePads; i++) {	
-			collision_check_pads(&froggy, &pads[i]);			
+			collision_check_pads(&froggy, &pads[i]);	
 			remove_lilypads_below(&pads[i], &froggy); 
 
 			// adjust the amount of active pads after without messing up the loop index
@@ -1729,6 +1725,7 @@ int main () {
 		DrawText(TextFormat("activeHearts: %d", activeHearts), 10, 580, 20, WHITE);
 		DrawText(TextFormat("tongue prog: %.2f", froggy.tongueProgress), 10, 610, 20, WHITE);
 		DrawText(TextFormat("drowdown: %d", froggy.dropDown), 10, 640, 20, WHITE);
+		DrawText(TextFormat("isJumping: %d", froggy.isJumping), 10, 670, 20, WHITE);
 
 
 
