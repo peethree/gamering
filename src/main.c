@@ -8,6 +8,12 @@
 // TODO: 
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
 // add something to the bottom of screen that forces upward movement, like a an angry horde of sharks idk could be anything. insta death when touched
+
+// duck horde on top
+// wavey blue line just below it
+// big blue screen under it
+// all moving upwards
+
 // when frog grows in size hitboxes need to grow with him
 // delay the tongue swipe speed
 // maybe add roguelike powers ?? 
@@ -22,11 +28,14 @@
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
 
+
+
 typedef enum Direction {
 	LEFT = -1,
 	RIGHT = 1,
 } Direction;
 
+// TODO: not used other than for alive / dead
 typedef enum Status{
 	ALIVE = 1,
 	DEAD = -1,
@@ -140,6 +149,14 @@ typedef struct Heart{
 	bool isActive;
 	bool isEaten;
 } Heart;
+
+typedef struct Duckhorde{
+	Texture2D texture;
+	Rectangle position;
+	Rectangle hitbox;
+	float velocity;
+	// what else?
+} Duckhorde;
 
 // gravity frog
 void apply_gravity(Frog *froggy) {	
@@ -303,7 +320,7 @@ void tongue_attack(Frog *froggy, float angle, float deltaTime, Vector2 cameraMou
 
 	if (froggy->isAttacking) {
         froggy->tongueTimer += deltaTime;
-		
+
 		// attack animation
         // tongue extends
         if (froggy->tongueTimer <= froggy->attackDuration / 2) {
@@ -1224,6 +1241,45 @@ void draw_heart(Heart *hearty) {
 	);
 }
 
+// TODO:
+void move_duckhorde(Duckhorde *duckies, float deltaTime) {		
+	duckies->position.y -= duckies->velocity * deltaTime;
+}
+
+// TODO:
+void hitbox_duckhorde(Duckhorde *duckies) {
+	duckies->hitbox = (Rectangle){
+		0,
+		0,
+		0,
+		0
+	};
+}
+
+void draw_duckhorde(Duckhorde *duckies) {
+	DrawTexturePro(
+		duckies->texture,
+		(Rectangle){
+			0,
+			0,
+			duckies->texture.width,
+			duckies->texture.height
+		},
+		(Rectangle){
+			duckies->position.x,
+			duckies->position.y,
+			duckies->texture.width,
+			duckies->texture.height
+		},
+		(Vector2){ 
+			0,   
+			0
+		},
+		0.0f,  
+		RAYWHITE  
+	);
+}
+
 int get_highscore() {    
     int highscore = 0;
 
@@ -1300,6 +1356,20 @@ int main () {
 		.spitCooldown = 0.0f
 	};		
 
+	Texture2D duckhorde_texture = LoadTexture("duckhorde.png");
+
+	// initialize duckhorde
+	Duckhorde duckies = (Duckhorde){
+		.texture = duckhorde_texture,
+		.position = (Rectangle){ 
+			.x = 0,
+			.y = 800,
+			.width = duckhorde_texture.width,
+			.height= duckhorde_texture.height
+			},
+		.velocity = DUCKHORDE_UPWARD_VELOCITY	
+	};
+
 	// 8 pictures on the frog sprite sheet -> 
 	const float frameWidth = (float)(frog_texture.width / 8);
 	const int maxFrames = (int)frog_texture.width / (int)frameWidth;
@@ -1316,6 +1386,7 @@ int main () {
 	Texture2D fish_texture = LoadTexture("fish.png");
 	Texture2D bugspit_texture = LoadTexture("bugspit.png");
 	Texture2D heart_texture = LoadTexture("heart.png");
+	
 
 	// mosquito (only 2 frames for directions)
 	const float frameWidthBug = (float)(mosquito_texture.width / 2);
@@ -1410,6 +1481,7 @@ int main () {
 			activeHearts++;
 		}
 
+		// frog updates
 		frog_reset_jumpstatus(&froggy);
 		hitbox_frog(&froggy);		
 		if (froggy.status == ALIVE) {									
@@ -1426,6 +1498,9 @@ int main () {
 		apply_gravity(&froggy);
 		move_frog_down(&froggy);
 		froggy_death(&froggy);
+
+		// duckhorde updates
+		move_duckhorde(&duckies, deltaTime);
 		
 		// update highscore in current game
         if (froggy.score > highscore) {
@@ -1611,6 +1686,9 @@ int main () {
 			 
 		draw_tongue(&froggy);
 
+		// draw duckhorde
+		draw_duckhorde(&duckies);
+
 		// draw bug spit
 		for (int i = 0; i < activeSpit; i++) {
 			if (!spitties[i].isActive) continue;
@@ -1745,6 +1823,7 @@ int main () {
 	UnloadTexture(fish_texture);
 	UnloadTexture(bugspit_texture);
 	UnloadTexture(heart_texture);
+	UnloadTexture(duckhorde_texture);
 
 	// destroy the window and cleanup the OpenGL context
 	CloseWindow();

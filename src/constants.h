@@ -45,6 +45,9 @@
 #define FROGGY_BUG_SPIT_COOLDOWN 0.1f
 #define FROGGY_BUG_SPIT_TIMER 0.0f
 
+// duckhorde
+#define DUCKHORDE_UPWARD_VELOCITY 100.0
+
 #define EPSILON 0.0001f
 
 #endif
