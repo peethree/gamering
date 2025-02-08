@@ -7,12 +7,8 @@
 
 // TODO: 
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
-// add something to the bottom of screen that forces upward movement, like a an angry horde of sharks idk could be anything. insta death when touched
 
-// duck horde on top
-// wavey blue line just below it
-// big blue screen under it
-// all moving upwards
+
 
 // when frog grows in size hitboxes need to grow with him
 // delay the tongue swipe speed
@@ -1248,7 +1244,7 @@ void move_duckhorde(Duckhorde *duckies, float deltaTime) {
 
 }
 
-// when froggy is very far upward, update duckhorde pos
+// when froggy is very far upward, update duckhorde pos so they're always close by. . . 
 void update_duckhorde_position(Duckhorde *duckies, Frog *froggy) {
 	if (froggy->position.y < duckies->position.y - 1200.0) {
 		duckies->position.y = froggy->position.y + 800.0;
@@ -1312,6 +1308,11 @@ void draw_duckhorde_surfline(Duckhorde *duckies, float deltaTime){
 		float y = (duckies->position.y + 400.0f) + sinf((x + duckies->wavetime * 100) * (2 * PI / wavelength)) * amplitude;
 		DrawCircle(x, (int)y, 3, DARKBLUE);  
 	}
+}
+
+void draw_duckhorde_water(Duckhorde *duckies) {
+	// below the surf draw big block
+	DrawRectangle(0, duckies->position.y + 400.0, 1280.0, 800.0, DARKBLUE);
 }
 
 int get_highscore() {    
@@ -1673,7 +1674,7 @@ int main () {
 		DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 	
 			
 		for (int i = 0; i < activePads; i++) {		
-			if (!pads[i].isActive) continue;
+			// if (!pads[i].isActive) continue;
 
 			// draw lilypads
 			DrawTextureRec(
@@ -1725,12 +1726,14 @@ int main () {
 		draw_tongue(&froggy);
 
 		// draw duckhorde
+		draw_duckhorde_water(&duckies);
 		draw_duckhorde(&duckies);
 		draw_duckhorde_surfline(&duckies, deltaTime);
+		
 
 		// draw bug spit
 		for (int i = 0; i < activeSpit; i++) {
-			if (!spitties[i].isActive) continue;
+			// if (!spitties[i].isActive) continue;
 			draw_spit(&spitties[i]);			
 		}
 
@@ -1742,7 +1745,7 @@ int main () {
 		// draw fish
 		for (int i = 0; i < activeFish; i++) {
 			// only draw while active
-			if (!fishies[i].isActive) continue;
+			// if (!fishies[i].isActive) continue;
 
 			DrawTextureRec(
 				fishies[i].texture,
