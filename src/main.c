@@ -1243,11 +1243,17 @@ void draw_heart(Heart *hearty) {
 }
 
 // TODO: add some variation to the upward movement.
-void move_duckhorde(Duckhorde *duckies, float deltaTime) {		
-	duckies->position.y -= duckies->velocity * deltaTime;
+void move_duckhorde(Duckhorde *duckies, float deltaTime) {	
+	duckies->position.y -= (duckies->velocity * GetRandomValue(100, 200)) * deltaTime;
+
 }
 
-// duckies->position.y + 400.0f for WAVE positioning
+// when froggy is very far upward, update duckhorde pos
+void update_duckhorde_position(Duckhorde *duckies, Frog *froggy) {
+	if (froggy->position.y < duckies->position.y - 1200.0) {
+		duckies->position.y = froggy->position.y + 800.0;
+	}
+}
 
 // TODO: fix hitbox
 void hitbox_duckhorde(Duckhorde *duckies) {
@@ -1283,12 +1289,14 @@ void draw_duckhorde(Duckhorde *duckies) {
 	);
 
 	// draw duckhorde hitbox
-	// DrawRectangleLinesEx(duckies->hitbox, 3, RED); 
+	DrawRectangleLinesEx(duckies->hitbox, 3, RED); 
 }
 
-// TODO:
+// p much insta death when the duckies reach the frog
 void froggy_duckhorde_collision(Frog *froggy, Duckhorde *duckies){
-	//
+	if (CheckCollisionRecs(froggy->hitbox, duckies->hitbox)) {
+		froggy->health -= 50.0;
+	}
 }
 
 // wave border below the ducks
@@ -1389,7 +1397,7 @@ int main () {
 		.texture = duckhorde_texture,
 		.position = (Rectangle){ 
 			.x = 0,
-			.y = 800,
+			.y = 1600,
 			.width = duckhorde_texture.width,
 			.height= duckhorde_texture.height
 			},
@@ -1525,6 +1533,8 @@ int main () {
 		apply_gravity(&froggy);
 		move_frog_down(&froggy);
 		froggy_death(&froggy);
+		froggy_duckhorde_collision(&froggy, &duckies);
+		update_duckhorde_position(&duckies, &froggy);
 
 		// duckhorde updates
 		hitbox_duckhorde(&duckies);
@@ -1828,6 +1838,7 @@ int main () {
 		DrawText(TextFormat("tongue prog: %.2f", froggy.tongueProgress), 10, 610, 20, WHITE);
 		DrawText(TextFormat("drowdown: %d", froggy.dropDown), 10, 640, 20, WHITE);
 		DrawText(TextFormat("isJumping: %d", froggy.isJumping), 10, 670, 20, WHITE);
+		DrawText(TextFormat("duckies pos: %.2f", duckies.position.y), 10, 700, 20, WHITE);
 
 
 
