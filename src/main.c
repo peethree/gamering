@@ -7,8 +7,7 @@
 
 // TODO: 
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
-
-
+// when wasp stings the froggy, apply poison damage over time, change frog color 
 
 // when frog grows in size hitboxes need to grow with him
 // delay the tongue swipe speed
@@ -42,6 +41,7 @@ typedef enum Status{
 	ACTIVE = 6,
 	EATEN = 7,
 	FISHTRAPPED = 8,
+	POISONED = 9
 } Status;
 
 typedef struct Frog {
@@ -51,6 +51,7 @@ typedef struct Frog {
     Rectangle tongue;
     Rectangle tongueHitbox;    
     Rectangle mouthPosition;
+	Color color;
 	Vector2 velocity;
     float tongueTimer;	
 	float spitCooldown;
@@ -68,7 +69,7 @@ typedef struct Frog {
     int score;
     int bugsEaten;
     Direction direction;
-    Status status;
+    Status status;	
     bool isAttacking;
     bool isShooting;
     bool isJumping;
@@ -161,6 +162,29 @@ void apply_gravity(Frog *froggy) {
 	if (froggy->velocity.y > FROGGY_FALL_VELOCITY) {
 		froggy->velocity.y = FROGGY_FALL_VELOCITY;
 	}
+}
+
+// change froggy's color based on its status
+void frog_color(Frog *froggy) {	
+	switch (froggy->status) {
+	case ALIVE:
+		froggy->color = RAYWHITE;
+		break;
+	case DEAD:
+		froggy->color = RED;
+		break;
+	case POISONED:
+		froggy->color = DARKGREEN;
+		break;
+	default:
+		froggy->color = RAYWHITE;
+		break;
+	}
+}
+
+// flask darkgreen on and off for poisoned effect
+void poisoned_frog_animation(Frog *froggy) {
+	//
 }
 
 // void jump_animation(Frog *froggy, int maxFrames, float deltaTime, float frameDuration) {
@@ -1519,6 +1543,7 @@ int main () {
 		}
 
 		// frog updates
+		frog_color(&froggy);
 		frog_reset_jumpstatus(&froggy);
 		hitbox_frog(&froggy);		
 		if (froggy.status == ALIVE) {									
@@ -1722,7 +1747,9 @@ int main () {
 				(float)froggy.texture.height * froggy.size / 2 
    			}, 
 			0,
-			(froggy.status == ALIVE) ? RAYWHITE : RED);	
+			froggy.color
+		);	
+			// (froggy.status == ALIVE) ? RAYWHITE : RED)
 			 
 		draw_tongue(&froggy);
 
