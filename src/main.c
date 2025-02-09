@@ -1239,9 +1239,10 @@ void draw_heart(Heart *hearty) {
 }
 
 // TODO: add some variation to the upward movement.
-void move_duckhorde(Duckhorde *duckies, float deltaTime) {	
-	duckies->position.y -= (duckies->velocity * GetRandomValue(100, 200)) * deltaTime;
-
+void move_duckhorde(Duckhorde *duckies, Frog *froggy, float deltaTime) {	
+	if (froggy->status == ALIVE) { 
+		duckies->position.y -= (duckies->velocity * GetRandomValue(100, 200)) * deltaTime;
+	}
 }
 
 // when froggy is very far upward, update duckhorde pos so they're always close by. . . 
@@ -1255,7 +1256,7 @@ void update_duckhorde_position(Duckhorde *duckies, Frog *froggy) {
 void hitbox_duckhorde(Duckhorde *duckies) {
 	duckies->hitbox = (Rectangle){
 		.x = duckies->position.x,
-		.y = duckies->position.y + 200.0f,
+		.y = duckies->position.y + 250.0f,
 		.width = 1280.0f,
 		.height = 200.0f
 	};
@@ -1539,7 +1540,7 @@ int main () {
 
 		// duckhorde updates
 		hitbox_duckhorde(&duckies);
-		move_duckhorde(&duckies, deltaTime);
+		move_duckhorde(&duckies, &froggy, deltaTime);
 		
 		// update highscore in current game
         if (froggy.score > highscore) {
@@ -1725,10 +1726,7 @@ int main () {
 			 
 		draw_tongue(&froggy);
 
-		// draw duckhorde
-		draw_duckhorde_water(&duckies);
-		draw_duckhorde(&duckies);
-		draw_duckhorde_surfline(&duckies, deltaTime);
+
 		
 
 		// draw bug spit
@@ -1810,6 +1808,11 @@ int main () {
 
 			// DrawRectangleLinesEx(wasps[i].hitbox, 1, RED); 
 		}
+
+		// draw duckhorde
+		draw_duckhorde_water(&duckies);
+		draw_duckhorde(&duckies);
+		draw_duckhorde_surfline(&duckies, deltaTime);
 
 		EndMode2D();
 		
