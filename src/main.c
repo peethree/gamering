@@ -6,14 +6,13 @@
 
 
 // TODO: 
+// every texture in 1 file?
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
-// when wasp stings the froggy, apply poison damage over time, change frog color 
-
-// when frog grows in size hitboxes need to grow with him
+// add an objective to win the game, princess frog way up high? space ship 2 fly away and escape the ducks?
+// change the wasp sprite
 // delay the tongue swipe speed
 // maybe add roguelike powers ?? 
-// scoring is a MESS atm
-// use the statuses instead of various booleans to clean up structs a bit??? might be a shit idea
+// scoring 
 // make landing on lilypads smoother ideally only interact with the pad when falling from above. keep track of y coordinate when jump was initiated?
 // use jumpheight to fix lilypad interactions as well as jumping on bug?
 // add some kind of menu when the game is over
@@ -38,12 +37,12 @@ typedef enum Status{
 
 typedef struct Frog {
     Texture2D texture;
+	Color color;
     Rectangle position;
     Rectangle hitbox;
     Rectangle tongue;
     Rectangle tongueHitbox;    
-    Rectangle mouthPosition;
-	Color color;
+    Rectangle mouthPosition;	
 	Vector2 velocity;
     float tongueTimer;	
 	float spitCooldown;
@@ -1351,6 +1350,7 @@ void draw_duckhorde_surfline(Duckhorde *duckies, float frameTime){
 	// draw a bunch of circles to simulate a wave, thx ai overlords
 	for (int x = 0; x < screenwidth; x++) {
 		float y = (duckies->position.y + 400.0f) + sinf((x + duckies->wavetime * 100) * (2 * PI / wavelength)) * amplitude;
+		// TODO: draw circle is expensive, use a circle texture instead for performance
 		DrawCircle(x, (int)y, 3, DARKBLUE);  
 	}
 }
