@@ -177,6 +177,7 @@ void frog_color(Frog *froggy, float frameTime) {
 		
 		froggy->poisonTimer += frameTime;			
 
+		// every modulo of changeTimer, change color n apply damage taken
 		if (fmod(froggy->poisonTimer, changeTimer * 2) < changeTimer) {
             froggy->color = DARKGREEN;
 			froggy->health -= 0.5;
