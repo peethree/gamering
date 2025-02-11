@@ -15,14 +15,12 @@
 // scoring 
 // make landing on lilypads smoother ideally only interact with the pad when falling from above. keep track of y coordinate when jump was initiated?
 // use jumpheight to fix lilypad interactions as well as jumping on bug?
-// add some kind of menu when the game is over
+// add some kind of menu when the game is over   
 // add more bug movement patterns
 // add proximity based bug buzzing hehehe
 // find a better way to deal with level building
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
-
-
 
 typedef enum Direction {
 	LEFT = -1,
@@ -71,6 +69,7 @@ typedef struct Frog {
 } Frog;
 
 typedef struct Bug{	
+	Sound sound;
 	Texture2D texture;
 	Rectangle position;
 	Rectangle hitbox;		
@@ -247,9 +246,7 @@ void jump_animation(Frog *froggy, int maxFrames, float frameTime, float frameDur
 
 void frog_reset_jumpstatus(Frog *froggy) {
 	// if frog is at the starting position
-	if (froggy->position.y >= (float)GetScreenHeight() - 50.0) {
-		froggy->isJumping = false;
-	}
+	if (froggy->position.y >= (float)GetScreenHeight() - 50.0) froggy->isJumping = false;
 }
 
 // smaller jump
@@ -860,9 +857,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float frameTime) {
 		// froggy is hitting the bug from the bottom
 		if (froggy->position.y > bug->position.y) {		
 			if (froggy->health >= 0.0) {
-				if (bug->type == "mosquito") {
-					froggy->health -= 2.0;	
-				}
+				if (bug->type == "mosquito") froggy->health -= 2.0;					
 				if (bug->type == "wasp") {
 					froggy->health -= 1.0;
 					froggy->isPoisoned = true;
@@ -1468,6 +1463,15 @@ int main () {
 	Texture2D fish_texture = LoadTexture("fish.png");
 	Texture2D bugspit_texture = LoadTexture("bugspit.png");
 	Texture2D heart_texture = LoadTexture("heart.png");
+
+	// TODO: add sounds
+	// Sound mosquito_buzz = LoadSound("mosquito.wav");
+	// Sound wasp_buzz = LoadSound("");
+	// Sound fish_splash = LoadSound("");
+	// Sound heart_healing = LoadSound("");
+	// Sound tongue_slurp = LoadSound("");
+	// Sound frog_leap = LoadSound("");
+	// TODO: what else?
 	
 
 	// mosquito (only 2 frames for directions)
@@ -1704,6 +1708,10 @@ int main () {
 		// drawing
 		BeginDrawing();
 
+		// audio
+		// NEEDS PULSEAUDIO
+		InitAudioDevice();
+
 		BeginMode2D(camera);		
 		
 		// follow the froggy's y position
@@ -1917,6 +1925,16 @@ int main () {
 	UnloadTexture(bugspit_texture);
 	UnloadTexture(heart_texture);
 	UnloadTexture(duckhorde_texture);
+
+	// unload sounds
+	// UnloadSound(mosquito_buzz);
+	// UnloadSound(wasp_buzz);
+	// UnloadSound(tongue_slurp);
+	// UnloadSound(heart_healing);
+	// UnloadSound(fish_splash);
+
+	// close audio
+	CloseAudioDevice();
 
 	// destroy the window and cleanup the OpenGL context
 	CloseWindow();
