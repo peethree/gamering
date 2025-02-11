@@ -250,7 +250,7 @@ void frog_reset_jumpstatus(Frog *froggy) {
 }
 
 // smaller jump
-void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime) {
+void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime, Sound mosquito_buzz) {
 	const float frameDuration = 0.10f;  
 	const float jumpDuration = 1.1f; 
 
@@ -260,7 +260,8 @@ void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime) {
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.7;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;	
-			froggy->jumpHeight = froggy->position.y;		
+			froggy->jumpHeight = froggy->position.y;	
+			PlaySound(mosquito_buzz);	
 
 			// start at second/third frame for more believable jump animation
 			froggy->frame = 2;          
@@ -1395,6 +1396,8 @@ int main () {
 
 	// Create the window and OpenGL context
 	InitWindow(1280, 800, "Frog");
+	// init audio
+	InitAudioDevice();	
 
 	// Utility function from resource_dir.h to find the resources folder and set it as the current working directory so we can load from it
 	SearchAndSetResourceDir("resources");
@@ -1465,7 +1468,7 @@ int main () {
 	Texture2D heart_texture = LoadTexture("heart.png");
 
 	// TODO: add sounds
-	// Sound mosquito_buzz = LoadSound("mosquito.wav");
+	Sound mosquito_buzz = LoadSound("mosquito.wav");
 	// Sound wasp_buzz = LoadSound("");
 	// Sound fish_splash = LoadSound("");
 	// Sound heart_healing = LoadSound("");
@@ -1513,6 +1516,9 @@ int main () {
 	float nextLilypadSpawn = 0.0f;	
 
 	// TODO: heart spawn timer?
+
+
+	
 
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
@@ -1572,7 +1578,7 @@ int main () {
 		frog_reset_jumpstatus(&froggy);
 		hitbox_frog(&froggy);		
 		if (froggy.status == ALIVE) {									
-			frog_baby_jump(&froggy, maxFrames, frameTime);
+			frog_baby_jump(&froggy, maxFrames, frameTime, mosquito_buzz);
 			frog_big_jump(&froggy, maxFrames, frameTime);
 			move_frog(&froggy);						
 		}
@@ -1710,7 +1716,7 @@ int main () {
 
 		// audio
 		// NEEDS PULSEAUDIO
-		InitAudioDevice();
+		
 
 		BeginMode2D(camera);		
 		
@@ -1927,7 +1933,7 @@ int main () {
 	UnloadTexture(duckhorde_texture);
 
 	// unload sounds
-	// UnloadSound(mosquito_buzz);
+	UnloadSound(mosquito_buzz);
 	// UnloadSound(wasp_buzz);
 	// UnloadSound(tongue_slurp);
 	// UnloadSound(heart_healing);
