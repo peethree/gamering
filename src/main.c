@@ -6,7 +6,12 @@
 
 
 // TODO: 
-// every texture in 1 file?
+// work on proximity sounds based on distance away from the frog
+	// look for a way to start audio files further in
+	// when bug dies, stop noise
+// when frog stays on a lilypad too long, make it disappear
+
+// every texture in 1 file?? performance maxx
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
 // add an objective to win the game, princess frog way up high? space ship 2 fly away and escape the ducks?
 // change the wasp sprite
@@ -110,6 +115,7 @@ typedef struct Lilypad{
 	Texture2D texture;
 	Rectangle position;
 	Rectangle hitbox;
+	float despawnTimer;
 	Status status;
 	int frame;
 	bool isActive;
@@ -1029,6 +1035,7 @@ void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;	
 	pad->hasFishTrap = false;
+	pad->despawnTimer = 0.0f;
 }
 
 void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
@@ -1042,9 +1049,10 @@ void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *frog
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;
 	pad->hasFishTrap = false;
+	pad->despawnTimer = 0.0f;
 }
 
-void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
+void deactivate_lilypads(Lilypad *pad, Frog *froggy) {
 	// get the highest y value visited
 	if (froggy->position.y < froggy->highestPosition) {
         froggy->highestPosition = froggy->position.y;
@@ -1053,7 +1061,29 @@ void remove_lilypads_below(Lilypad *pad, Frog *froggy) {
 	// remove lilypads when froggy has climbed certain distance
     if (pad->isActive && pad->position.y > froggy->highestPosition + 1500.0f) {
         pad->isActive = false;
-    }
+    }	
+}
+
+// remove lilypads when froggy is staying on it too long
+void deactivate_lilypad_collision(Lilypad *pad, Frog *froggy, float frameTime) {
+	// pad->despawnTimer = 0.0f;
+
+	float timer = (float)GetRandomValue(2,4);
+
+	// increment timer when frog makes contact with lilypad
+	if (CheckCollisionRecs(pad->hitbox, froggy->hitbox)) {
+		pad->despawnTimer += frameTime;
+	}	
+
+	// warning sound right before it despawns
+	// if (pad->despawnTimer >= (0.75 * timer)) {
+	// 	playSound(warning!);
+	// }
+
+	// when timer exceeds certain value, deactivate pad
+	if (pad->despawnTimer >= timer) {
+		pad->isActive = false;		
+	}
 }
 
 // once fish is active, animate it (once).
@@ -1636,7 +1666,8 @@ int main () {
 		int activePadsAfterLoop = 0;		
 		for (int i = 0; i < activePads; i++) {	
 			collision_check_pads(&froggy, &pads[i]);	
-			remove_lilypads_below(&pads[i], &froggy); 
+			deactivate_lilypads(&pads[i], &froggy); 
+			deactivate_lilypad_collision(&pads[i], &froggy, frameTime);
 
 			// adjust the amount of active pads after without messing up the loop index
 			if (pads[i].isActive) {
