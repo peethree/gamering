@@ -991,10 +991,24 @@ void deactivate_buzz(Bug *bug) {
 	}	
 }
 
+
+// TODO: proximity based buzzing
+void buzz_volume_control(Bug *bug, Frog *froggy) {
+
+	// euclidian distance between frog n bug
+	float distance = sqrt(pow(bug->position.x - froggy->position.x, 2) + pow(bug->position.y - froggy->position.y, 2));
+
+	// if the bug is left from frog -> pan sound left
+	// else pan sound right
+
+	// only play sounds when the mosquito is in frame. (0, 1280)
+
+	// full volume close by, min volume far away
+}
+
 void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, const char *sound_path) {	
 	// initialize mosquito(es)
 	mosquito->sound = create_mosquito_buzz_instance(sound_path);
-	// mosquito->sound = mosquito_buzz;
 
 	// make buzzing noise TODO: proximity based and fix performance
 	PlaySound(mosquito->sound);
@@ -1459,7 +1473,7 @@ int main () {
 	// Utility function from resource_dir.h to find the resources folder and set it as the current working directory so we can load from it
 	SearchAndSetResourceDir("resources");
 
-	int highscore = get_highscore();
+	int highscore = get_highscore();	
 
 	Texture2D frog_texture = LoadTexture("frog.png");	
 
@@ -1582,6 +1596,7 @@ int main () {
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
 	{
 		// updates
+		int fps = GetFPS();
 		float frameTime = GetFrameTime();
 
 		mosquitoSpawnTimer += frameTime;
@@ -1942,6 +1957,8 @@ int main () {
 		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, RED);
 		DrawText(TextFormat("Score: %d", froggy.score), 500, 40, 40, WHITE);
 		DrawText(TextFormat("Highscore: %d", highscore), 500, 80, 40, YELLOW);
+		DrawText(TextFormat("fps: %d", fps), 500, 120, 40, GREEN);
+		
 
 		// debug 
 		DrawText(TextFormat("Position: %.2f", froggy.position.y), 10, 10, 20, WHITE);
