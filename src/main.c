@@ -99,6 +99,7 @@ typedef struct Bug{
 	Status status;			
 	bool isActive;	
 	bool isEaten;	
+	bool isBuzzing;
 } Bug;
 
 typedef struct Bugspit{
@@ -256,7 +257,7 @@ void frog_reset_jumpstatus(Frog *froggy) {
 }
 
 // smaller jump
-void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime, Sound mosquito_buzz) {
+void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime) {
 	const float frameDuration = 0.10f;  
 	const float jumpDuration = 1.1f; 
 
@@ -266,8 +267,7 @@ void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime, Sound mosquito
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.7;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;	
-			froggy->jumpHeight = froggy->position.y;	
-			PlaySound(mosquito_buzz);	
+			froggy->jumpHeight = froggy->position.y;					
 
 			// start at second/third frame for more believable jump animation
 			froggy->frame = 2;          
@@ -746,11 +746,13 @@ void deactivate_bug(Bug *bug, Frog *froggy) {
 	// deactivate bug at y distance difference			
 	if (bug->isActive && (bug->position.y > froggy->position.y + 1000.0f)) {
 		bug->isActive = false;
+		bug->isBuzzing = false;
 	}
 
 	// and x difference (these numbers need to be further than where the bugs spawn)
 	if (bug->isActive && ((bug->direction == RIGHT && bug->position.x > 1500.0f) || (bug->direction == LEFT && bug->position.x < -900.0f))) {
 		bug->isActive = false;
+		bug->isBuzzing = false;
 	}	
 }
 
@@ -796,6 +798,7 @@ void eat_bug(Frog *froggy, Bug *bug, float frameTime) {
 		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) || CheckCollisionRecs(froggy->mouthPosition, bug->hitbox)) {
 			froggy->size += 0.10;
 			bug->isActive = false;
+			bug->isBuzzing = false;
 			froggy->bugsEaten++;
 		}	
     }
@@ -971,8 +974,31 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 	}
 }
 
-void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {	
+// from resources, grab the mosquito buzz and make a new sound instance of it
+Sound create_mosquito_buzz_instance(const char *sound_path) {	
+    Sound Buzz = LoadSound(sound_path);
+    return Buzz;
+}
+
+// free sound instances when bug is inactive 
+void deactivate_buzz(Bug *bug) {
+	if (!bug->isBuzzing) {
+		StopSound(bug->sound);		
+	}	
+
+	if (!bug->isActive) {
+		UnloadSound(bug->sound);
+	}	
+}
+
+void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, const char *sound_path) {	
 	// initialize mosquito(es)
+	mosquito->sound = create_mosquito_buzz_instance(sound_path);
+	// mosquito->sound = mosquito_buzz;
+
+	// make buzzing noise TODO: proximity based and fix performance
+	PlaySound(mosquito->sound);
+
     mosquito->texture = mosquito_texture;
 	mosquito->position = (Rectangle){	
 		// either spawn on the left or the right side just past the window's edge	
@@ -995,7 +1021,8 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture) {
 	mosquito->isActive = true;
 	mosquito->type = "mosquito";
 	mosquito->isEaten = false;
-	mosquito->health = 1.0;
+	mosquito->health = 1.0;	
+	mosquito->isBuzzing = true;
 }
 
 void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {	
@@ -1498,7 +1525,8 @@ int main () {
 	Texture2D heart_texture = LoadTexture("heart.png");
 
 	// TODO: add sounds
-	Sound mosquito_buzz = LoadSound("mosquito.wav");
+	// Sound mosquito_buzz = LoadSound("mosquito.wav");
+	const char *sound_path_mosquito_buzz = "mosquito.wav";
 	// Sound wasp_buzz = LoadSound("");
 	// Sound fish_splash = LoadSound("");
 	// Sound heart_healing = LoadSound("");
@@ -1561,7 +1589,7 @@ int main () {
 
 		// spawn mosquitoes 
 		if (mosquitoSpawnTimer >= MOSQUITO_SPAWN_INTERVAL && activeMosquitoes < MAX_MOSQUITOES) {
-			spawn_mosquito(&mosquitoes[activeMosquitoes], &froggy, mosquito_texture);
+			spawn_mosquito(&mosquitoes[activeMosquitoes], &froggy, mosquito_texture, sound_path_mosquito_buzz);
 			activeMosquitoes++;
 			mosquitoSpawnTimer = 0.0f;	
 		}		
@@ -1608,7 +1636,7 @@ int main () {
 		frog_reset_jumpstatus(&froggy);
 		hitbox_frog(&froggy);		
 		if (froggy.status == ALIVE) {									
-			frog_baby_jump(&froggy, maxFrames, frameTime, mosquito_buzz);
+			frog_baby_jump(&froggy, maxFrames, frameTime);
 			frog_big_jump(&froggy, maxFrames, frameTime);
 			move_frog(&froggy);						
 		}
@@ -1692,6 +1720,7 @@ int main () {
 			bug_death(&mosquitoes[i]);
 			bug_spit_death(&mosquitoes[i], frameTime, &froggy);
 			deactivate_bug(&mosquitoes[i], &froggy);
+			deactivate_buzz(&mosquitoes[i]);
 			
 			// remove inactive mosquitoes after the loop 
 			if (mosquitoes[i].isActive) {
@@ -1964,7 +1993,7 @@ int main () {
 	UnloadTexture(duckhorde_texture);
 
 	// unload sounds
-	UnloadSound(mosquito_buzz);
+	// UnloadSound(mosquito_buzz);
 	// UnloadSound(wasp_buzz);
 	// UnloadSound(tongue_slurp);
 	// UnloadSound(heart_healing);
