@@ -95,6 +95,7 @@ typedef struct Bug{
 	float frameTimer;	
 	float health;
 	float caughtTongueLength;
+	float volume;
 	int frame;
 	Status status;			
 	bool isActive;	
@@ -986,13 +987,17 @@ void deactivate_buzz(Bug *bug) {
 		StopSound(bug->sound);		
 	}	
 
+	if (bug->status == DEAD) {
+		StopSound(bug->sound);
+	}
+
 	if (!bug->isActive) {
 		UnloadSound(bug->sound);
 	}	
 }
 
 // TODO: proximity based buzzing
-void buzz_volume_control(Bug *bug, Frog *froggy) {
+void buzz_volume_control(Bug *bug, Frog *froggy, float maxDistance) {
 
 	// euclidian distance between frog n bug
 	float distance = sqrt(pow(bug->position.x - froggy->position.x, 2) + pow(bug->position.y - froggy->position.y, 2));
@@ -1001,43 +1006,42 @@ void buzz_volume_control(Bug *bug, Frog *froggy) {
 	if (bug->position.x > 0 && bug->position.x < SCREEN_WIDTH) {
 		// volume logic
 		// normalize distance 
-		float normDist = 1.0 - (distance / SCREEN_WIDTH); 
+		float normDist = 1.0 - (distance / maxDistance); 
 
 		// full volume close by, min volume far away
 		// set volume based on distance
 		float volume = normDist;
 
 		// max = 1.0
-		if (volume > MAX_VOLUME) {
-			volume = MAX_VOLUME;
-		}
+		if (volume > MAX_VOLUME) volume = MAX_VOLUME;		
 
 		// min = 0
-		if (volume < MIN_VOLUME) {
-			volume = MIN_VOLUME;
+		if (volume < MIN_VOLUME) volume = MIN_VOLUME;	
+
+		// limit the buzzing when bug is stuck to froggy tongue
+		if (bug->isEaten) {
+			volume = 0.1;
 		}
-	}	
+		SetSoundVolume(bug->sound, volume);	
+	// offscreen volume
+	} else {
+		SetSoundVolume(bug->sound, 0);
+	}
 }
 
 void volume_panning(Bug *bug, Frog *froggy) {
 	// if bug is to the left of froggy, pan sound left and vice versa
-	// bug is to the right of froggy
-	if (froggy->position.x < bug->position.x) {
-		// pan 0.0f is all the way left, 1.0 is all the way right
-		float pan = 1.0f;		
+		float pan = (bug->position.x - froggy->position.x) / SCREEN_WIDTH;
+		pan = (pan + 1.0f) / 2.0f;
 		SetSoundPan(bug->sound, pan);
-	} else if (froggy->position.x > bug->position.x) { // left
-		float pan = 0.0f;
-		SetSoundPan(bug->sound, pan);
-	} else {
-		float pan = 0.5f;
-		SetSoundPan(bug->sound, pan);
-	}
 }
+
 
 void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, const char *sound_path) {	
 	// initialize mosquito(es)
 	mosquito->sound = create_mosquito_buzz_instance(sound_path);
+	mosquito->volume = 0;
+	SetSoundVolume(mosquito->sound, mosquito->volume);
 
 	// make buzzing noise TODO: proximity based and fix performance
 	PlaySound(mosquito->sound);
@@ -1066,6 +1070,7 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, con
 	mosquito->isEaten = false;
 	mosquito->health = 1.0;	
 	mosquito->isBuzzing = true;
+	
 }
 
 void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {	
@@ -1566,6 +1571,9 @@ int main () {
 	Texture2D fish_texture = LoadTexture("fish.png");
 	Texture2D bugspit_texture = LoadTexture("bugspit.png");
 	Texture2D heart_texture = LoadTexture("heart.png");
+	
+	// max distance for sounds
+	float maxDistance = sqrt(SCREEN_WIDTH * SCREEN_WIDTH + SCREEN_HEIGHT * SCREEN_HEIGHT); 
 
 	// TODO: add sounds
 	// Sound mosquito_buzz = LoadSound("mosquito.wav");
@@ -1753,7 +1761,7 @@ int main () {
 		for (int i = 0; i < activeMosquitoes; i++) {	
 			move_mosquito(&mosquitoes[i], frameTime);	
 			volume_panning(&mosquitoes[i], &froggy);
-			buzz_volume_control(&mosquitoes[i], &froggy);
+			buzz_volume_control(&mosquitoes[i], &froggy, maxDistance);
 			hitbox_bug(&mosquitoes[i]);
 			collision_check_bugs(&froggy, &mosquitoes[i], frameTime);
 			eat_bug(&froggy, &mosquitoes[i], frameTime);
