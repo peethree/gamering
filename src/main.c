@@ -96,6 +96,7 @@ typedef struct Bug{
 	float health;
 	float caughtTongueLength;
 	int frame;
+	int buzzIndex;
 	Status status;			
 	bool isActive;	
 	bool isEaten;	
@@ -154,6 +155,8 @@ typedef struct Duckhorde{
 	float wavetime;
 	// what else?
 } Duckhorde;
+
+bool buzzInUse[MAX_MOSQUITOES] = { false };
 
 // gravity frog
 void apply_gravity(Frog *froggy) {	
@@ -796,8 +799,9 @@ void eat_bug(Frog *froggy, Bug *bug, float frameTime) {
 
 		// increase in size from eating bug
 		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) || CheckCollisionRecs(froggy->mouthPosition, bug->hitbox)) {
-			froggy->size += 0.10;
+			froggy->size += 0.10;			
 			bug->isActive = false;
+			bug->status = DEAD;
 			bug->isBuzzing = false;
 			froggy->bugsEaten++;
 		}	
@@ -976,29 +980,26 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 
 // TODO: Instead of loading sounds during the game, load up MAX_MOSQUITO amount of buzz sounds and reuse those indefinitely.
 // from resources, grab the mosquito buzz and make a new sound instance of it
-Sound create_mosquito_buzz_instance(const char *sound_path) {	
-    Sound Buzz = LoadSound(sound_path);
-    return Buzz;
+
+// fill up the buzzes array with usable buzzes
+void create_mosquito_buzz_instance(const char *sound_path, Sound buzzes[], int *activeBuzzes) {	
+	buzzes[*activeBuzzes] = LoadSound(sound_path); 
+	(*activeBuzzes)++;  
 }
 
-// free sound instances when bug is inactive 
-void deactivate_buzz(Bug *bug) {
-	if (!bug->isBuzzing) {
-		StopSound(bug->sound);		
-	}	
-
-	if (bug->status == DEAD) {
-		StopSound(bug->sound);
-	}
-
-	if (!bug->isActive) {
-		UnloadSound(bug->sound);
-	}	
+// free the sound and set in use to false so it can be reused by a new mosquito.
+void free_buzz(Bug *bug, Sound buzzes[]) {
+    if (bug->status == DEAD) {
+        if (bug->buzzIndex >= 0 && bug->buzzIndex < MAX_MOSQUITOES) {
+            StopSound(buzzes[bug->buzzIndex]);  
+            buzzInUse[bug->buzzIndex] = false;  
+            bug->buzzIndex = -1;  
+        }
+    }
 }
 
 // proximity based buzzing
 void buzz_volume_control(Bug *bug, Frog *froggy, float maxDistance) {
-
 	// euclidian distance between frog n bug
 	float distance = sqrt(pow(bug->position.x - froggy->position.x, 2) + pow(bug->position.y - froggy->position.y, 2));
 
@@ -1035,13 +1036,28 @@ void volume_panning(Bug *bug, Frog *froggy) {
 		SetSoundPan(bug->sound, pan);
 }
 
-void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, const char *sound_path) {	
-	// initialize mosquito(es)
-	mosquito->sound = create_mosquito_buzz_instance(sound_path);
-	SetSoundVolume(mosquito->sound, 0);
+// checks if a buzz is already in use
+int get_buzz_index() {
+    for (int i = 0; i < MAX_MOSQUITOES; i++) {
+        if (!buzzInUse[i]) {  
+            buzzInUse[i] = true;
+            return i;
+        }
+    }
+	// no available buzz index slot
+    return -1; 
+}
 
-	// make buzzing noise TODO: proximity based and fix performance
-	PlaySound(mosquito->sound);
+void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sound buzzes[]) {	
+	// initialize mosquito(es)	
+
+	// buzz
+	mosquito->buzzIndex = get_buzz_index();
+	if (mosquito->buzzIndex >= 0 && mosquito->buzzIndex < MAX_MOSQUITOES) {
+		mosquito->sound = buzzes[mosquito->buzzIndex];
+		SetSoundVolume(mosquito->sound, 0);	
+		PlaySound(mosquito->sound);
+	}		
 
     mosquito->texture = mosquito_texture;
 	mosquito->position = (Rectangle){	
@@ -1601,6 +1617,7 @@ int main () {
 	Bugspit spitties[FROGGY_MAX_BUG_SPIT];
 	Lilypad pads[MAX_LILLYPADS];
 	Heart hearties[MAX_HEARTS];
+	Sound buzzes[MAX_MOSQUITOES];
 
 	int activeMosquitoes = 0;	
 	int activeWasps = 0;	
@@ -1608,6 +1625,12 @@ int main () {
 	int activeSpit = 0;
 	int activePads = 0;
 	int activeHearts = 0;
+	int activeBuzzes = 0;
+
+	// prepare the buzz sounds for the mosquitoes	
+	while (activeBuzzes < MAX_MOSQUITOES) {
+		create_mosquito_buzz_instance(sound_path_mosquito_buzz, buzzes, &activeBuzzes);
+	}
 
 	// bug spawntimer
 	float mosquitoSpawnTimer = MOSQUITO_SPAWN_TIMER;		
@@ -1621,10 +1644,7 @@ int main () {
 	
 	float nextLilypadSpawn = 0.0f;	
 
-	// TODO: heart spawn timer?
-
-
-	
+	// TODO: heart spawn timer?	
 
 	// game loop
 	while (!WindowShouldClose()) // run the loop untill the user presses ESCAPE or presses the Close button on the window
@@ -1638,7 +1658,7 @@ int main () {
 
 		// spawn mosquitoes 
 		if (mosquitoSpawnTimer >= MOSQUITO_SPAWN_INTERVAL && activeMosquitoes < MAX_MOSQUITOES) {
-			spawn_mosquito(&mosquitoes[activeMosquitoes], &froggy, mosquito_texture, sound_path_mosquito_buzz);
+			spawn_mosquito(&mosquitoes[activeMosquitoes], &froggy, mosquito_texture, buzzes);
 			activeMosquitoes++;
 			mosquitoSpawnTimer = 0.0f;	
 		}		
@@ -1704,12 +1724,7 @@ int main () {
 
 		// duckhorde updates
 		hitbox_duckhorde(&duckies);
-		move_duckhorde(&duckies, &froggy, frameTime);
-		
-		// update highscore in current game
-        if (froggy.score > highscore) {
-            highscore = froggy.score;
-        }
+		move_duckhorde(&duckies, &froggy, frameTime);	
 
 		// update spitties
 		int activeSpitAfterLoop = 0;
@@ -1762,7 +1777,7 @@ int main () {
 			hitbox_bug(&mosquitoes[i]);
 			collision_check_bugs(&froggy, &mosquitoes[i], frameTime);
 			eat_bug(&froggy, &mosquitoes[i], frameTime);
-			move_caught_bug(&mosquitoes[i], &froggy, frameTime);
+			move_caught_bug(&mosquitoes[i], &froggy, frameTime);			
 
 			for (int j = 0; j < activeSpit; j++) {
 				collision_check_spit(&spitties[j], &mosquitoes[i]);
@@ -1771,7 +1786,7 @@ int main () {
 			bug_death(&mosquitoes[i]);
 			bug_spit_death(&mosquitoes[i], frameTime, &froggy);
 			deactivate_bug(&mosquitoes[i], &froggy);
-			deactivate_buzz(&mosquitoes[i]);
+			free_buzz(&mosquitoes[i], buzzes);
 			
 			// remove inactive mosquitoes after the loop 
 			if (mosquitoes[i].isActive) {
@@ -1821,14 +1836,14 @@ int main () {
     	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
 			froggy.position.y = GetScreenHeight() - froggy.position.height;
 		}
+
+		// update highscore in current game
+        if (froggy.score > highscore) {
+            highscore = froggy.score;
+        }
 	
 		// drawing
-		BeginDrawing();
-
-		// audio
-		// NEEDS PULSEAUDIO
-		
-
+		BeginDrawing();	
 		BeginMode2D(camera);		
 		
 		// follow the froggy's y position
@@ -1847,8 +1862,6 @@ int main () {
 		DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 	
 			
 		for (int i = 0; i < activePads; i++) {		
-			// if (!pads[i].isActive) continue;
-
 			// draw lilypads
 			DrawTextureRec(
 				pads[i].texture,
@@ -1863,7 +1876,7 @@ int main () {
 			);
 			
 			// lilypad hitbox visual
-			DrawRectangleLinesEx(pads[i].hitbox, 1, RED); 			
+			// DrawRectangleLinesEx(pads[i].hitbox, 1, RED); 			
 		}
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
@@ -1896,12 +1909,8 @@ int main () {
 			0,
 			froggy.color
 		);	
-			// (froggy.status == ALIVE) ? RAYWHITE : RED)
 			 
-		draw_tongue(&froggy);
-
-
-		
+		draw_tongue(&froggy);		
 
 		// draw bug spit
 		for (int i = 0; i < activeSpit; i++) {
@@ -2045,7 +2054,10 @@ int main () {
 	UnloadTexture(heart_texture);
 	UnloadTexture(duckhorde_texture);
 
-	// unload sounds
+	// unload sounds (should be MAX_MOSQUITOES)
+	for (int i = 0; i < activeBuzzes; i++) {
+		UnloadSound(buzzes[i]);
+	}
 	// UnloadSound(mosquito_buzz);
 	// UnloadSound(wasp_buzz);
 	// UnloadSound(tongue_slurp);
