@@ -989,7 +989,7 @@ void create_mosquito_buzz_instance(const char *sound_path, Sound buzzes[], int *
 
 // free the sound and set in use to false so it can be reused by a new mosquito.
 void free_buzz(Bug *bug, Sound buzzes[]) {
-    if (bug->status == DEAD) {
+    if (bug->status == DEAD || !bug->isActive) {
         if (bug->buzzIndex >= 0 && bug->buzzIndex < MAX_MOSQUITOES) {
             StopSound(buzzes[bug->buzzIndex]);  
             buzzInUse[bug->buzzIndex] = false;  
@@ -1006,7 +1006,7 @@ void buzz_volume_control(Bug *bug, Frog *froggy, float maxDistance) {
 	// only play sounds when the mosquito is in field of view. (-50, 1280)
 	if (bug->position.x > -50.0 && bug->position.x < SCREEN_WIDTH) {		
 		// normalize distance * magic number for enhanced effect
-		float normDist = 1.0 - (distance / maxDistance * 1.5); 
+		float normDist = 1.0 - (distance / maxDistance * 2.5); 
 
 		// set volume based on distance
 		float volume = normDist;
@@ -1019,8 +1019,7 @@ void buzz_volume_control(Bug *bug, Frog *froggy, float maxDistance) {
 		if (bug->isEaten) {
 			volume = 0.2;
 			SetSoundPitch(bug->sound, 0.9);
-		}
-		
+		}		
 		SetSoundVolume(bug->sound, volume);	
 	// offscreen volume
 	} else {
@@ -1028,15 +1027,15 @@ void buzz_volume_control(Bug *bug, Frog *froggy, float maxDistance) {
 	}
 }
 
-void volume_panning(Bug *bug, Frog *froggy) {
-	// if bug is to the left of froggy, pan sound left and vice versa
+// if bug is to the left of froggy, pan sound left and vice versa
+void volume_panning(Bug *bug, Frog *froggy) {	
 		float pan = (bug->position.x - froggy->position.x) / SCREEN_WIDTH;
 		// normalize pan 
 		pan = (pan + 1.0f) / 2.0f;
 		SetSoundPan(bug->sound, pan);
 }
 
-// checks if a buzz is already in use
+// checks if a buzz sound is already in use
 int get_buzz_index() {
     for (int i = 0; i < MAX_MOSQUITOES; i++) {
         if (!buzzInUse[i]) {  
@@ -1051,7 +1050,7 @@ int get_buzz_index() {
 void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sound buzzes[]) {	
 	// initialize mosquito(es)	
 
-	// buzz
+	// buzz related
 	mosquito->buzzIndex = get_buzz_index();
 	if (mosquito->buzzIndex >= 0 && mosquito->buzzIndex < MAX_MOSQUITOES) {
 		mosquito->sound = buzzes[mosquito->buzzIndex];
@@ -1070,7 +1069,7 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sou
 
 	mosquito->spawnPosition = (Vector2){ mosquito->position.x, mosquito->position.y };
 
-    if (mosquito->spawnPosition.x < 640.0f) { 
+    if (mosquito->spawnPosition.x < SCREEN_WIDTH / 2) { 
         mosquito->direction = RIGHT;          
     } else {
         mosquito->direction = LEFT;         
