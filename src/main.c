@@ -991,19 +991,48 @@ void deactivate_buzz(Bug *bug) {
 	}	
 }
 
-
 // TODO: proximity based buzzing
 void buzz_volume_control(Bug *bug, Frog *froggy) {
 
 	// euclidian distance between frog n bug
 	float distance = sqrt(pow(bug->position.x - froggy->position.x, 2) + pow(bug->position.y - froggy->position.y, 2));
 
-	// if the bug is left from frog -> pan sound left
-	// else pan sound right
+	// only play sounds when the mosquito is in field of view. (0, 1280)
+	if (bug->position.x > 0 && bug->position.x < SCREEN_WIDTH) {
+		// volume logic
+		// normalize distance 
+		float normDist = 1.0 - (distance / SCREEN_WIDTH); 
 
-	// only play sounds when the mosquito is in frame. (0, 1280)
+		// full volume close by, min volume far away
+		// set volume based on distance
+		float volume = normDist;
 
-	// full volume close by, min volume far away
+		// max = 1.0
+		if (volume > MAX_VOLUME) {
+			volume = MAX_VOLUME;
+		}
+
+		// min = 0
+		if (volume < MIN_VOLUME) {
+			volume = MIN_VOLUME;
+		}
+	}	
+}
+
+void volume_panning(Bug *bug, Frog *froggy) {
+	// if bug is to the left of froggy, pan sound left and vice versa
+	// bug is to the right of froggy
+	if (froggy->position.x < bug->position.x) {
+		// pan 0.0f is all the way left, 1.0 is all the way right
+		float pan = 1.0f;		
+		SetSoundPan(bug->sound, pan);
+	} else if (froggy->position.x > bug->position.x) { // left
+		float pan = 0.0f;
+		SetSoundPan(bug->sound, pan);
+	} else {
+		float pan = 0.5f;
+		SetSoundPan(bug->sound, pan);
+	}
 }
 
 void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, const char *sound_path) {	
@@ -1723,6 +1752,8 @@ int main () {
 		int activeMosquitoesAfterLoop = 0;		
 		for (int i = 0; i < activeMosquitoes; i++) {	
 			move_mosquito(&mosquitoes[i], frameTime);	
+			volume_panning(&mosquitoes[i], &froggy);
+			buzz_volume_control(&mosquitoes[i], &froggy);
 			hitbox_bug(&mosquitoes[i]);
 			collision_check_bugs(&froggy, &mosquitoes[i], frameTime);
 			eat_bug(&froggy, &mosquitoes[i], frameTime);
