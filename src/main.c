@@ -8,10 +8,6 @@
 // TODO: 
 // work on proximity sounds based on distance away from the frog
 	// look for a way to start audio files further in
-	// when bug dies, stop noise
-// when frog stays on a lilypad too long, make it disappear
-
-// every texture in 1 file?? performance maxx
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
 // add an objective to win the game, princess frog way up high? space ship 2 fly away and escape the ducks?
 // change the wasp sprite
@@ -21,8 +17,8 @@
 // make landing on lilypads smoother ideally only interact with the pad when falling from above. keep track of y coordinate when jump was initiated?
 // use jumpheight to fix lilypad interactions as well as jumping on bug?
 // add some kind of menu when the game is over   
+// and maybe a menu b4 playing
 // add more bug movement patterns
-// add proximity based bug buzzing hehehe
 // find a better way to deal with level building
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
@@ -32,7 +28,6 @@ typedef enum Direction {
 	RIGHT = 1,
 } Direction;
 
-// TODO: not used other than for alive / dead
 typedef enum Status{	
 	ALIVE = 1,
 	DEAD = -1,
@@ -55,11 +50,11 @@ typedef struct Frog {
     float jumpHeight;
     float jumpTimer;
     float frameTimer;
-    float highestPosition;
-    float size;
+    float highestPosition;    
     float spitAngle;
 	float tongueProgress;
 	float poisonTimer;
+	float size;
     int frame;
     int score;
     int bugsEaten;
@@ -132,10 +127,10 @@ typedef struct Fish{
 	float attackDuration;
 	float attackTimer;
 	float frameTimer;
-	float size;
 	Status status;
 	Direction direction;
 	int frame;
+	int size;
 	bool isActive;
 	bool isAttacking;	
 } Fish;
@@ -168,7 +163,7 @@ void apply_gravity(Frog *froggy) {
 	}
 }
 
-// change froggy's color based on its status, TODO: handle every enum at some point
+// change froggy's color based on its status
 void frog_color(Frog *froggy, float frameTime) {	
 	switch (froggy->status) {
 	case ALIVE:
@@ -197,11 +192,9 @@ void frog_color(Frog *froggy, float frameTime) {
 	}
 }
 
-
-
-// Wasp has poisoned the frog
+// Wasp has poisoned the frog 8-(
 void frog_poisoned(Frog *froggy, float frameTime) {
-	float poisonDuration = 8.0;
+	float poisonDuration = WASP_POISON_DURATION;
 
 	if (froggy->isPoisoned) {
 		froggy->poisonTimer += frameTime;
@@ -213,9 +206,7 @@ void frog_poisoned(Frog *froggy, float frameTime) {
 	}
 }
 
-// flash darkgreen on and off for poisoned effect
-
-
+// loops
 // void jump_animation(Frog *froggy, int maxFrames, float frameTime, float frameDuration) {
 // 	if (froggy->isJumping) {			
 // 		froggy->frameTimer += frameTime;
@@ -239,6 +230,7 @@ void frog_poisoned(Frog *froggy, float frameTime) {
 // 	}
 // }
 
+// single animation (no loop)
 void jump_animation(Frog *froggy, int maxFrames, float frameTime, float frameDuration) {
     if (froggy->isJumping) {
         froggy->frameTimer += frameTime;
@@ -256,19 +248,22 @@ void jump_animation(Frog *froggy, int maxFrames, float frameTime, float frameDur
     }
 }
 
-void frog_reset_jumpstatus(Frog *froggy) {
-	// if frog is at the starting position
+// frog is at the starting position and doesn't land on a lilypad
+void frog_reset_jumpstatus(Frog *froggy) {	
 	if (froggy->position.y >= (float)GetScreenHeight() - 50.0) froggy->isJumping = false;
 }
 
 // smaller jump
-void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime) {
+void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_leap) {
 	const float frameDuration = 0.10f;  
 	const float jumpDuration = 1.1f; 
 
 	// froggy->velocity.x = 0.0;
 	if (froggy->status == ALIVE) {
-		if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {			
+		if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
+			SetSoundPitch(frog_leap, 1.0);
+			SetSoundVolume(frog_leap, 0.3);
+			PlaySound(frog_leap);			
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.7;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;	
@@ -282,12 +277,15 @@ void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime) {
 	}			
 }
 
-void frog_big_jump(Frog *froggy, int maxFrames, float frameTime) {
+void frog_big_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_leap) {
 	const float frameDuration = 0.25f;  
 	const float jumpDuration = 1.4f;  
 
 	if (froggy->status == ALIVE) {
-		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {			
+		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {	
+			SetSoundPitch(frog_leap, 0.90);
+			SetSoundVolume(frog_leap, 0.3);
+			PlaySound(frog_leap);		
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;	
@@ -295,8 +293,7 @@ void frog_big_jump(Frog *froggy, int maxFrames, float frameTime) {
 
 			// start at second/third frame for more believable jump animation
 			froggy->frame = 2;          
-			froggy->frameTimer = 0.0f;  
-			
+			froggy->frameTimer = 0.0f;  			
 		}	
 	}
 	jump_animation(froggy, maxFrames, frameTime, frameDuration);		
@@ -317,7 +314,6 @@ void move_frog(Frog *froggy) {
 		froggy->direction = RIGHT;
 					
 	}
-
 	if (IsKeyDown(KEY_A)) {
 		if (froggy->isJumping) {
 			froggy->velocity.x = -FROGGY_JUMP_VELOCITY_X;
@@ -328,6 +324,7 @@ void move_frog(Frog *froggy) {
 	}
 }	
 
+// allow to fall through a lilypad
 void move_frog_down(Frog *froggy) {
 	// if frog is currently on a lilypad (colliding)
 	if (IsKeyDown(KEY_S)) {
@@ -348,7 +345,7 @@ void screen_flip(Frog *froggy) {
 	}
 }
 
-// update frog hitbox in one place
+// update frog hitbox based on position
 void hitbox_frog(Frog *froggy) {		
 	froggy->hitbox = (Rectangle){
 		.x = froggy->position.x - 20.0f,
@@ -358,9 +355,12 @@ void hitbox_frog(Frog *froggy) {
 	};	
 }
  
-void tongue_attack(Frog *froggy, float angle, float frameTime, Vector2 cameraMousePosition) {
-	// tongue lash
+// tongue lash
+void tongue_attack(Frog *froggy, float angle, float frameTime, Vector2 cameraMousePosition, Sound tongue_slurp) {	
 	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && !froggy->isShooting) {
+		// this sound sucks
+		SetSoundPitch(tongue_slurp, 1.0);
+		PlaySound(tongue_slurp);
         froggy->isAttacking = true;
         froggy->tongueTimer = 0.0f;   		
 		froggy->direction = (cameraMousePosition.x < froggy->mouthPosition.x) ? LEFT : RIGHT;     
@@ -377,7 +377,7 @@ void tongue_attack(Frog *froggy, float angle, float frameTime, Vector2 cameraMou
         // tongue retracts
         else {
             froggy->tongueProgress = 1.0f - ((froggy->tongueTimer - froggy->attackDuration / 2) / (froggy->attackDuration / 2));
-        }
+		}
 
         // tongue length calculation
         float currentLength = FROGGY_TONGUE_LENGTH * froggy->tongueProgress;
@@ -464,8 +464,7 @@ void tongue_attack(Frog *froggy, float angle, float frameTime, Vector2 cameraMou
 
 // for the first half of the tongue attack, move the mosquitoes with the tongue.
 void move_caught_bug(Bug *bug, Frog *froggy, float frameTime) {
-    if (bug->isEaten && froggy->tongueTimer <= FROGGY_TONGUE_TIMER / 2) {
-        
+    if (bug->isEaten && froggy->tongueTimer <= FROGGY_TONGUE_TIMER / 2) {        
         float angle = froggy->tongueAngle * DEG2RAD;
 
         bug->position.x = froggy->mouthPosition.x + cosf(angle) * bug->caughtTongueLength;
@@ -473,9 +472,9 @@ void move_caught_bug(Bug *bug, Frog *froggy, float frameTime) {
     }
 }
 
+// TODO: consider making this a generic function
 void move_caught_heart(Heart *hearty, Frog *froggy, float frameTime) {
-	if (hearty->isEaten && froggy->tongueTimer <= FROGGY_TONGUE_TIMER / 2) {
-        
+	if (hearty->isEaten && froggy->tongueTimer <= FROGGY_TONGUE_TIMER / 2) {        
         float angle = froggy->tongueAngle * DEG2RAD;
 
         hearty->position.x = froggy->mouthPosition.x + cosf(angle) * hearty->caughtTongueLength;
@@ -506,6 +505,7 @@ void spit_bug(Frog *froggy, float angle, Vector2 cameraMousePosition, Texture2D 
 				};			
 
 				// initialize new bug spit at activespit index
+				// TODO: simplify this?
 				spitties[*activeSpit] = (Bugspit){
 					.position = froggy->mouthPosition,
 					.texture = bugspit_texture,
@@ -555,7 +555,8 @@ void draw_spit(Bugspit *spitty) {
 		spitty->texture, 
 		spitty->position.x, 
 		spitty->position.y, 
-		RAYWHITE);
+		RAYWHITE
+	);
 
 	// debug spit hitbox
     // DrawRectanglePro(
@@ -584,7 +585,7 @@ void deactivate_spit(Bugspit *spitty, Frog *froggy) {
 	}
 }
 
-// // keep track of where on the sprite the tongue should appear from
+// keep track of where on the sprite the tongue should appear from
 void frog_mouth_position(Frog *froggy) {
 	if (froggy->direction == RIGHT) {				   //offsets to spawn tongue closer to mouth
 		froggy->mouthPosition.x = froggy->position.x + (7.0f * froggy->size * 1.9);
@@ -595,7 +596,7 @@ void frog_mouth_position(Frog *froggy) {
 	}
 }
  
-void frog_attack_params(Frog *froggy, float frameTime, Camera2D camera, Texture2D bugspit_texture, int *activeSpit, Bugspit *spitties) {	
+void frog_attack_params(Frog *froggy, float frameTime, Camera2D camera, Texture2D bugspit_texture, int *activeSpit, Bugspit *spitties, Sound tongue_slurp) {	
 	// despawn tongue when froggy dies
 	if (froggy->status == DEAD) {
 		froggy->isAttacking = false;
@@ -610,11 +611,10 @@ void frog_attack_params(Frog *froggy, float frameTime, Camera2D camera, Texture2
 	float dx = cameraMousePosition.x - froggy->mouthPosition.x;
 	float dy = cameraMousePosition.y - froggy->mouthPosition.y;
 	
-	// angle
+	// angle --> tan⁻¹(dy/dx)
 	float angle = atan2f(dy, dx);
 
-
-	tongue_attack(froggy, angle, frameTime, cameraMousePosition);	
+	tongue_attack(froggy, angle, frameTime, cameraMousePosition, tongue_slurp);	
 
 	// spit bug
 	// if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) && !froggy->isAttacking && !froggy->isShooting) {
@@ -775,14 +775,12 @@ void bug_spit_death(Bug *bug, float frameTime, Frog *froggy) {
 	}
 }
 
-// TODO: when progress is 0, deactivate the bug and count it as eaten.
 // you will eat the bugs
 void eat_bug(Frog *froggy, Bug *bug, float frameTime) {
     // start pulling the bug toward the froggy when the tongue starts retracting
     if (froggy->status == ALIVE && bug->isEaten && froggy->tongueTimer >= FROGGY_TONGUE_TIMER / 2) { 
 		// update length based on retraction progress
 		float currentLength = bug->caughtTongueLength * froggy->tongueProgress;
-
 		float angle = froggy->tongueAngle * DEG2RAD;
 
 		// update bug position		
@@ -810,13 +808,13 @@ void eat_bug(Frog *froggy, Bug *bug, float frameTime) {
     }
 }
 
+// TODO: make either this or the other eat function generic
 void froggy_eat_heart(Frog *froggy, Heart *hearty, float frameTime) {
 	// drag the heart over to the frog by the tongue
 	if (hearty->isEaten && froggy->tongueTimer >= FROGGY_TONGUE_TIMER / 2) { 
 
 		// update length based on retraction progress
 		float currentLength = hearty->caughtTongueLength * froggy->tongueProgress;
-
 		float angle = froggy->tongueAngle * DEG2RAD;
 
 		// update hearty position		
@@ -835,6 +833,7 @@ void froggy_eat_heart(Frog *froggy, Heart *hearty, float frameTime) {
 	}
 }
 
+// TODO: maybe split these into 2, 1 for mosquito and 1 for wasps
 void hitbox_bug(Bug *bug) {
 	// mosquito hitbox
 	if (bug->type == "mosquito") {	
@@ -879,7 +878,6 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float frameTime) {
 					froggy->isPoisoned = true;
 				}
 			}	
-
 			// bump froggy down when trying to jump through a bug
 			// TODO: instead of bump down, slow velocity
 			// froggy->velocity.y *= 0.50;
@@ -907,8 +905,8 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float frameTime) {
 	}	
 }
 
-void froggy_death(Frog *froggy) {
-	// frog dies when health goes to 0 . . . .	
+// frog dies when health goes to 0 . . . .	
+void froggy_death(Frog *froggy) {	
 	if (froggy->health <= 0) {
 		froggy->velocity.x = 0;
 		froggy->health = 0;
@@ -980,16 +978,13 @@ void collision_check_pads(Frog *froggy, Lilypad *pad) {
 	}
 }
 
-// TODO: Instead of loading sounds during the game, load up MAX_MOSQUITO amount of buzz sounds and reuse those indefinitely.
-// from resources, grab the mosquito buzz and make a new sound instance of it
-
 // fill up the buzzes array with usable buzzes
 void create_mosquito_buzz_instance(const char *sound_path, Sound buzzes[], int *activeBuzzes) {	
 	buzzes[*activeBuzzes] = LoadSound(sound_path); 
 	(*activeBuzzes)++;  
 }
 
-// free the sound and set in use to false so it can be reused by a new mosquito.
+// free the sound and set in use to false so it can be reused by a freshly spawned mosquito.
 void free_buzz(Bug *bug, Sound buzzes[]) {
     if (bug->status == DEAD || !bug->isActive) {
         if (bug->buzzIndex >= 0 && bug->buzzIndex < MAX_MOSQUITOES) {
@@ -1019,7 +1014,7 @@ void buzz_volume_control(Bug *bug, Frog *froggy, float maxDistance) {
 
 		// change the pitch and volume when bug is caught on the tongue
 		if (bug->isEaten) {
-			volume = 0.2;
+			volume = 0.9;
 			SetSoundPitch(bug->sound, 0.9);
 		}		
 		SetSoundVolume(bug->sound, volume);	
@@ -1049,9 +1044,8 @@ int get_buzz_index() {
     return -1; 
 }
 
-void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sound buzzes[]) {	
-	// initialize mosquito(es)	
-
+// initialize mosquito(es)
+void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sound buzzes[]) {		
 	// buzz related
 	mosquito->buzzIndex = get_buzz_index();
 	if (mosquito->buzzIndex >= 0 && mosquito->buzzIndex < MAX_MOSQUITOES) {
@@ -1070,25 +1064,22 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sou
 	};	
 
 	mosquito->spawnPosition = (Vector2){ mosquito->position.x, mosquito->position.y };
-
     if (mosquito->spawnPosition.x < SCREEN_WIDTH / 2) { 
         mosquito->direction = RIGHT;          
     } else {
         mosquito->direction = LEFT;         
     }
-
     mosquito->frame = 0;
 	mosquito->status = ALIVE;
 	mosquito->isActive = true;
 	mosquito->type = "mosquito";
 	mosquito->isEaten = false;
 	mosquito->health = 1.0;	
-	mosquito->isBuzzing = true;
-	
+	mosquito->isBuzzing = true;	
 }
 
-void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {	
-	// initialize wasps
+// initialize wasps
+void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {		
     wasp->texture = wasp_texture;
     wasp->position = (Rectangle){
 		froggy->position.x + (float)GetRandomValue(-250, 250), 
@@ -1099,11 +1090,13 @@ void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {
 
 	wasp->spawnPosition = (Vector2){ wasp->position.x, wasp->position.y };
     wasp->angle = 0;
-    wasp->radius = (float)GetRandomValue(500, 700);	
-	// TODO: spiralspeed 0 should be prevented?
-    wasp->spiralSpeed = (float)GetRandomValue(-3,3);
-    wasp->convergence = (float)GetRandomValue(12,18);
-    wasp->minRadius = 3.0f;	
+    wasp->radius = (float)GetRandomValue(WASP_RADIUS_MIN, WASP_RADIUS_MAX);	
+	// random direction
+	int randomDirection = GetRandomValue(0,1);
+	wasp->direction = (randomDirection == 0) ? LEFT : RIGHT;
+    wasp->spiralSpeed = (float)GetRandomValue(WASP_SPIRAL_SPEED_MIN, WASP_SPIRAL_SPEED_MAX) * wasp->direction;
+    wasp->convergence = (float)GetRandomValue(WASP_CONVERGENCE_MIN, WASP_CONVERGENCE_MAX);
+    wasp->minRadius = WASP_CLOSEST_RADIUS;	
 	wasp->status = ALIVE;
 	wasp->isActive = true;
 	wasp->type = "wasp";
@@ -1112,8 +1105,8 @@ void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {
 	wasp->health = 10.0;
 }
 
-void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {	
-	// initialize the platforms	
+// initialize the platforms	
+void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {		
 	pad->texture = lilypad_texture;
 	pad->position = (Rectangle){
 		.x = froggy->position.x + GetRandomValue(-700, 600),
@@ -1155,8 +1148,6 @@ void deactivate_lilypads(Lilypad *pad, Frog *froggy) {
 
 // remove lilypads when froggy is staying on it too long
 void deactivate_lilypad_collision(Lilypad *pad, Frog *froggy, float frameTime) {
-	// pad->despawnTimer = 0.0f;
-
 	float timer = (float)GetRandomValue(2,4);
 
 	// increment timer when frog makes contact with lilypad
@@ -1178,7 +1169,8 @@ void deactivate_lilypad_collision(Lilypad *pad, Frog *froggy, float frameTime) {
 // once fish is active, animate it (once).
 void animate_fish(Fish *fishy, float frameTime, int maxFramesFish) {	
 	if (fishy->isAttacking) {
-		float frameDuration = 0.2f;
+		// divided by the number of frames on the sprite sheet
+		float frameDuration = FISH_ATTACK_DURATION / 8;
 		fishy->frameTimer += frameTime;
 
 		if (fishy->frameTimer >= frameDuration) {
@@ -1194,6 +1186,7 @@ void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePa
 	// pick a random lilypad between 0 and the max active pads for a fish to spawn under
 	int randomValue = GetRandomValue(0, activePads - 1);	
 
+	// TODO: i don't like the way it looks when fish spawn too close to eachother, worth looking into
 	// don't double spawn fish on lilypads
 	if (!pads[randomValue].hasFishTrap) {
 		fishy->position = pads[randomValue].position;	
@@ -1210,16 +1203,14 @@ void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePa
 	fishy->frame = 0;
 
 	// get random size
-	float randomFishSize = (float)GetRandomValue(FISH_MIN_SIZE, FISH_MAX_SIZE);
-	fishy->size = randomFishSize;
-
+	fishy->size = GetRandomValue(FISH_MIN_SIZE, FISH_MAX_SIZE);
 	// get random direction
 	int randomDirection = GetRandomValue(0,1);
 	fishy->direction = (randomDirection == 0) ? RIGHT : LEFT; 	
 }
 
-// trigger the fish by stepping on its initial hitbox 
-void activate_fish(Fish *fishy, Frog *froggy) {
+// trigger the fishy ambush by stepping on its initial hitbox 
+void activate_fish(Fish *fishy, Frog *froggy, Sound fish_splash) {
 	if (!fishy->isAttacking) {
 		// fish hitbox 
 		fishy->hitbox = (Rectangle){
@@ -1229,8 +1220,25 @@ void activate_fish(Fish *fishy, Frog *froggy) {
 			.height = 20.0f
 		};	
 
+		// different splash volumes for size fish
+		switch (fishy->size) {
+		case 1:
+			SetSoundVolume(fish_splash, 0.4);
+			break;
+		case 2:
+			SetSoundVolume(fish_splash, 0.7);
+			break;
+		case 3:
+			SetSoundVolume(fish_splash, 1.0);
+			break;		
+		default:
+			break;
+		}
+
 		if (CheckCollisionRecs(fishy->hitbox, froggy->hitbox) && fishy->isActive) {
 			fishy->isAttacking = true;
+			SetSoundVolume(fish_splash, 1.0);
+			PlaySound(fish_splash);
 		}
 	}
 }
@@ -1346,6 +1354,7 @@ void spawn_healing_heart(Heart *hearty, Texture2D heart_texture, Lilypad *pads, 
 	hearty->isEaten = false;
 }
 
+// update heart hitbox
 void hitbox_heart(Heart *hearty) {
 	hearty->hitbox = (Rectangle){
 		hearty->position.x,
@@ -1387,6 +1396,7 @@ void animate_heart(Heart *hearty, float frameTime) {
 	// move y posish smoothly
 }
 
+// draw heart
 void draw_heart(Heart *hearty) {
 	DrawTextureRec(
 		hearty->texture,
@@ -1404,21 +1414,21 @@ void draw_heart(Heart *hearty) {
 	);
 }
 
-// TODO: add some variation to the upward movement.
+// duck movement.
 void move_duckhorde(Duckhorde *duckies, Frog *froggy, float frameTime) {	
 	if (froggy->status == ALIVE) { 
 		duckies->position.y -= (duckies->velocity * GetRandomValue(100, 200)) * frameTime;
 	}
 }
 
-// when froggy is very far upward, update duckhorde pos so they're always close by. . . 
+// when froggy is very far upward, update duckhorde position so they'll be near again. . . 
 void update_duckhorde_position(Duckhorde *duckies, Frog *froggy) {
 	if (froggy->position.y < duckies->position.y - 1200.0) {
 		duckies->position.y = froggy->position.y + 800.0;
 	}
 }
 
-// TODO: fix hitbox
+// duck hitbox
 void hitbox_duckhorde(Duckhorde *duckies) {
 	duckies->hitbox = (Rectangle){
 		.x = duckies->position.x,
@@ -1428,6 +1438,7 @@ void hitbox_duckhorde(Duckhorde *duckies) {
 	};
 }
 
+// draw duck
 void draw_duckhorde(Duckhorde *duckies) {
 	DrawTexturePro(
 		duckies->texture,
@@ -1455,7 +1466,7 @@ void draw_duckhorde(Duckhorde *duckies) {
 	DrawRectangleLinesEx(duckies->hitbox, 3, RED); 
 }
 
-// p much insta death when the duckies reach the frog
+// p much insta-death when the duckies reach the frog
 void froggy_duckhorde_collision(Frog *froggy, Duckhorde *duckies){
 	if (CheckCollisionRecs(froggy->hitbox, duckies->hitbox)) {
 		froggy->health -= 50.0;
@@ -1473,7 +1484,7 @@ void draw_duckhorde_surfline(Duckhorde *duckies, float frameTime){
 	// draw a bunch of circles to simulate a wave, thx ai overlords
 	for (int x = 0; x < screenwidth; x++) {
 		float y = (duckies->position.y + 400.0f) + sinf((x + duckies->wavetime * 100) * (2 * PI / wavelength)) * amplitude;
-		// TODO: draw circle is expensive, use a circle texture instead for performance
+		// TODO: draw circle is an expensive operation, use a circle texture instead for performance?
 		DrawCircle(x, (int)y, 3, DARKBLUE);  
 	}
 }
@@ -1523,7 +1534,7 @@ int main () {
 
 	// Create the window and OpenGL context
 	InitWindow(1280, 800, "Frog");
-	// init audio
+	// initialize audio
 	InitAudioDevice();	
 
 	// Utility function from resource_dir.h to find the resources folder and set it as the current working directory so we can load from it
@@ -1598,13 +1609,12 @@ int main () {
 	float maxDistance = sqrt(SCREEN_WIDTH * SCREEN_WIDTH + SCREEN_HEIGHT * SCREEN_HEIGHT); 
 
 	// TODO: add sounds
-	// Sound mosquito_buzz = LoadSound("mosquito.wav");
 	const char *sound_path_mosquito_buzz = "mosquito.wav";
 	// Sound wasp_buzz = LoadSound("");
-	// Sound fish_splash = LoadSound("");
+	Sound fish_splash = LoadSound("splash.wav");
 	// Sound heart_healing = LoadSound("");
-	// Sound tongue_slurp = LoadSound("");
-	// Sound frog_leap = LoadSound("");
+	Sound tongue_slurp = LoadSound("lick.wav");
+	Sound frog_leap = LoadSound("jump.wav");
 	// TODO: what else?
 	
 
@@ -1714,13 +1724,13 @@ int main () {
 		frog_reset_jumpstatus(&froggy);
 		hitbox_frog(&froggy);		
 		if (froggy.status == ALIVE) {									
-			frog_baby_jump(&froggy, maxFrames, frameTime);
-			frog_big_jump(&froggy, maxFrames, frameTime);
+			frog_baby_jump(&froggy, maxFrames, frameTime, frog_leap);
+			frog_big_jump(&froggy, maxFrames, frameTime, frog_leap);
 			move_frog(&froggy);						
 		}
 		frog_mouth_position(&froggy);
 		// lots of function params, kind of N A S T Y 
-		frog_attack_params(&froggy, frameTime, camera, bugspit_texture, &activeSpit, spitties);			
+		frog_attack_params(&froggy, frameTime, camera, bugspit_texture, &activeSpit, spitties, tongue_slurp);			
 		frog_prevent_overheal(&froggy);
 		screen_flip(&froggy);
 		apply_velocity(&froggy, frameTime);	
@@ -1830,7 +1840,7 @@ int main () {
 		// update fish
 		int activeFishAfterLoop = 0;
 		for (int i = 0; i < activeFish; i++) {
-			activate_fish(&fishies[i], &froggy);
+			activate_fish(&fishies[i], &froggy, fish_splash);
 			animate_fish(&fishies[i], frameTime, maxFramesFish);	
 			attacking_fish_collision(&fishies[i], &froggy);		
 			deactivate_fish(&fishies[i], &froggy, frameTime);			
@@ -1953,7 +1963,6 @@ int main () {
 				RAYWHITE                                 
 			);
 
-
 			// draw fish hitbox
 			DrawRectangleLinesEx(fishies[i].hitbox, 1, RED); 
 		}
@@ -1980,8 +1989,6 @@ int main () {
 				(mosquitoes[i].status == ALIVE) ? RAYWHITE : RED);		
 
 			DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 
-			// DrawText(TextFormat("spawn Position y: %.2f", mosquitoes[i].spawnPosition.y), 10, 310 + 20 * i, 20, WHITE);	
-			// DrawText(TextFormat("spawn Position x: %.2f", mosquitoes[i].spawnPosition.x), 10, 330 + 20 * i, 20, WHITE);				
 		}
 
 		// draw wasps
