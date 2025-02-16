@@ -132,10 +132,12 @@ typedef struct Fish{
 	float attackDuration;
 	float attackTimer;
 	float frameTimer;
+	float size;
 	Status status;
+	Direction direction;
 	int frame;
 	bool isActive;
-	bool isAttacking;
+	bool isAttacking;	
 } Fish;
 
 typedef struct Heart{
@@ -1202,10 +1204,18 @@ void spawn_fish(Fish *fishy, Texture2D fish_texture, Lilypad *pads, int activePa
 	fishy->frameTimer = 0.0f;
 	fishy->texture = fish_texture;
 	fishy->isAttacking = false;
-	fishy->attackDuration = 1.6f;	
+	fishy->attackDuration = FISH_ATTACK_DURATION;	
 	fishy->isActive = true;
 	fishy->attackTimer = 0.0f;
 	fishy->frame = 0;
+
+	// get random size
+	float randomFishSize = (float)GetRandomValue(FISH_MIN_SIZE, FISH_MAX_SIZE);
+	fishy->size = randomFishSize;
+
+	// get random direction
+	int randomDirection = GetRandomValue(0,1);
+	fishy->direction = (randomDirection == 0) ? RIGHT : LEFT; 	
 }
 
 // trigger the fish by stepping on its initial hitbox 
@@ -1232,64 +1242,64 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
 				.y = fishy->position.y,
-				.width = 60.0f,
-				.height = 20.0f
+				.width = 60.0f * fishy->size,
+				.height = 20.0f * fishy->size
 			};
 			break;
 		case 1:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
 				.y = fishy->position.y + 20.0f,
-				.width = 60.0f,
-				.height = 30.0f
+				.width = 60.0f * fishy->size,
+				.height = 30.0f * fishy->size
 			};		
 			break;	
 		case 2:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
 				.y = fishy->position.y + 15.0f,
-				.width = 60.0f,
-				.height = 40.0f
+				.width = 60.0f * fishy->size,
+				.height = 40.0f * fishy->size
 			};
 			break;
 		case 3:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
 				.y = fishy->position.y - 10.0f,
-				.width = 60.0f,
-				.height = 60.0f
+				.width = 60.0f * fishy->size,
+				.height = 60.0f * fishy->size
 			};
 			break;
 		case 4:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
 				.y = fishy->position.y - 40.0f,
-				.width = 60.0f,
-				.height = 80.0f
+				.width = 60.0f * fishy->size,
+				.height = 80.0f * fishy->size
 			};
 			break;
 		case 5:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
 				.y = fishy->position.y - 30.0f,
-				.width = 60.0f,
-				.height = 70.0f
+				.width = 60.0f * fishy->size,
+				.height = 70.0f * fishy->size
 			};
 			break;	
 		case 6:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
 				.y = fishy->position.y - 20.0f,
-				.width = 60.0f,
-				.height = 40.0f
+				.width = 60.0f * fishy->size,
+				.height = 40.0f * fishy->size
 			};
 			break;
 		case 7:
 			fishy->hitbox = (Rectangle){			
 				.x = fishy->position.x,
 				.y = fishy->position.y - 20.0f,
-				.width = 60.0f,
-				.height = 1.0f
+				.width = 60.0f * fishy->size,
+				.height = 1.0f * fishy->size
 			};
 			break;
 		default:
@@ -1298,7 +1308,7 @@ void attacking_fish_collision(Fish *fishy, Frog *froggy) {
 
 	if (fishy->isAttacking && fishy->frame > 1) {
 		if (CheckCollisionRecs(fishy->hitbox, froggy->hitbox)) {
-			froggy->health -= 0.15;
+			froggy->health -= FISH_ATTACK_DAMAGE * fishy->size;
 		}
 	}
 }
@@ -1913,7 +1923,6 @@ int main () {
 
 		// draw bug spit
 		for (int i = 0; i < activeSpit; i++) {
-			// if (!spitties[i].isActive) continue;
 			draw_spit(&spitties[i]);			
 		}
 
@@ -1924,26 +1933,32 @@ int main () {
 
 		// draw fish
 		for (int i = 0; i < activeFish; i++) {
-			// only draw while active
-			// if (!fishies[i].isActive) continue;
-
-			DrawTextureRec(
-				fishies[i].texture,
+			DrawTexturePro(
+				fishies[i].texture,  
 				(Rectangle){
-					frameWidthFish * fishies[i].frame,
-					0,
-					frameWidthFish,
-					fishies[i].texture.height
+					frameWidthFish * fishies[i].frame,  
+					0,                                  
+					frameWidthFish * (float)fishies[i].direction,                      
+					fishies[i].texture.height            
 				},
-				(Vector2){ fishies[i].position.x, fishies[i].position.y},
-				RAYWHITE
+				(Rectangle){
+					fishies[i].position.x,               
+					fishies[i].position.y,   
+					// increase size of texture            
+					frameWidthFish * fishies[i].size,       
+					fishies[i].texture.height * fishies[i].size 
+				},
+				(Vector2){0, 0},                         
+				0.0f,                                    
+				RAYWHITE                                 
 			);
 
+
 			// draw fish hitbox
-			// DrawRectangleLinesEx(fishies[i].hitbox, 1, RED); 
+			DrawRectangleLinesEx(fishies[i].hitbox, 1, RED); 
 		}
 
-		// draw the bugs
+		// draw mosquitoes
 		for (int i = 0; i < activeMosquitoes; i++) {									
 
 			// annoying twitching animation by scaling it from 90 / 100% size every frame :thumbs_up:
@@ -1960,7 +1975,8 @@ int main () {
 					frameWidthBug * GetRandomValue(9,10) / 10.0,					
 					(float)mosquitoes[i].texture.height * GetRandomValue(9,10) / 10.0},
 				(Vector2){ 0, 0 },
-				0.0f,
+				// draw angle based on froggy tongue when caught
+				(mosquitoes[i].isEaten) ? froggy.tongueAngle : 0.0f,
 				(mosquitoes[i].status == ALIVE) ? RAYWHITE : RED);		
 
 			DrawRectangleLinesEx(mosquitoes[i].hitbox, 1, RED); 

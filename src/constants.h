@@ -20,7 +20,11 @@
 #define WASP_VELOCITY_DEATH_FALL 460.0f
 
 // fish
-#define MAX_FISH 10
+#define MAX_FISH 5
+#define FISH_MIN_SIZE 1
+#define FISH_MAX_SIZE 3
+#define FISH_ATTACK_DURATION 1.6f
+#define FISH_ATTACK_DAMAGE 0.15f
 
 // heart
 #define MAX_HEARTS 1
