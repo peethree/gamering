@@ -2082,9 +2082,10 @@ int main () {
 	}
 	// UnloadSound(mosquito_buzz);
 	// UnloadSound(wasp_buzz);
-	// UnloadSound(tongue_slurp);
+	UnloadSound(frog_leap);
+	UnloadSound(tongue_slurp);
 	// UnloadSound(heart_healing);
-	// UnloadSound(fish_splash);
+	UnloadSound(fish_splash);
 
 	// close audio
 	CloseAudioDevice();
