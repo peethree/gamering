@@ -4,10 +4,12 @@
 #include "resource_dir.h"	
 #include <stdio.h> 
 
-
 // TODO: 
+// add an enemy that spits fire at the frog, add a burning status for the frog similar to poison
+// consider adding sound effects for poison/ burning status 
+// add sound effect for bug spit, jumping on mosquitoes / wasps, hitbox interaction of spit + wasp 
 // work on proximity sounds based on distance away from the frog
-	// look for a way to start audio files further in
+// look for a way to start audio files further in?
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
 // add an objective to win the game, princess frog way up high? space ship 2 fly away and escape the ducks?
 // change the wasp sprite
@@ -230,6 +232,7 @@ void frog_poisoned(Frog *froggy, float frameTime) {
 // 	}
 // }
 
+// TODO: currently keeps looping while froggy is freefalling FIX 
 // single animation (no loop)
 void jump_animation(Frog *froggy, int maxFrames, float frameTime, float frameDuration) {
     if (froggy->isJumping) {
@@ -254,9 +257,9 @@ void frog_reset_jumpstatus(Frog *froggy) {
 }
 
 // smaller jump
-void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_leap) {
-	const float frameDuration = 0.10f;  
+void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_leap) {	  
 	const float jumpDuration = 1.1f; 
+	const float frameDuration = jumpDuration / 6; 
 
 	// froggy->velocity.x = 0.0;
 	if (froggy->status == ALIVE) {
@@ -278,8 +281,8 @@ void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_lea
 }
 
 void frog_big_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_leap) {
-	const float frameDuration = 0.25f;  
-	const float jumpDuration = 1.4f;  
+	const float jumpDuration = 1.4f; 
+	const float frameDuration = jumpDuration / 6;  	 
 
 	if (froggy->status == ALIVE) {
 		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {	
@@ -381,10 +384,13 @@ void tongue_attack(Frog *froggy, float angle, float frameTime, Vector2 cameraMou
 
         // tongue length calculation
         float currentLength = FROGGY_TONGUE_LENGTH * froggy->tongueProgress;
+
+		float cosAngle = cosf(angle);
+		float sinAngle = sinf(angle);
         
         // tongue endpoint
-        float tongueEndX = froggy->mouthPosition.x + cosf(angle) * currentLength;
-        float tongueEndY = froggy->mouthPosition.y + sinf(angle) * currentLength;
+        float tongueEndX = froggy->mouthPosition.x + cosAngle * currentLength;
+        float tongueEndY = froggy->mouthPosition.y + sinAngle * currentLength;
         
         // TODO: this spazzes out the frog when aiming above it
 		// turn frog in direction of the mouseclick, added deadzone	        		
@@ -403,10 +409,7 @@ void tongue_attack(Frog *froggy, float angle, float frameTime, Vector2 cameraMou
 		float halfWidth = FROGGY_TONGUE_WIDTH / 2;
 
 		// corners of the froggy tongue hitbox      
-		Vector2 corners[4];
-        float cosAngle = cosf(angle);
-        float sinAngle = sinf(angle);
-
+		Vector2 corners[4];   
         // offset vectors for the four corners
         Vector2 widthOffset = {
             halfWidth * sinAngle,
@@ -2021,6 +2024,7 @@ int main () {
 
 		EndMode2D();
 		
+		// TODO: make this N I C E 
 		DrawText(TextFormat("Health: %.2f", froggy.health), 500, 0, 40, RED);
 		DrawText(TextFormat("Score: %d", froggy.score), 500, 40, 40, WHITE);
 		DrawText(TextFormat("Highscore: %d", highscore), 500, 80, 40, YELLOW);
