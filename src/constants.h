@@ -65,6 +65,14 @@
 #define DUCKHORDE_WAVELENGTH 100.0f
 #define DUCKHORDE_WAVE_AMPLITUDE 4.0f
 
+// flamespitters
+#define MAX_FLAMESPITTERS 2
+#define FLAME_SPITTER_SPIT_COOLDOWN 0.3f
+
+// flameprojectiles
+#define MAX_FLAMEPROJECTILES 10
+#define FLAME_PROJECTILE_SPEED 300.0f
+
 // proximity volume
 // TODO: 
 #define VOLUME_MAX_DISTANCE 10.0f
