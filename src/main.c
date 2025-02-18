@@ -5,6 +5,8 @@
 #include <stdio.h> 
 
 // TODO: 
+// make a texture for flame spitter / flame projectile
+// call flamespitter / projectile functions in gameplayloop
 // add an enemy that spits fire at the frog, add a burning status for the frog similar to poison
 // consider adding sound effects for poison/ burning status 
 // add sound effect for bug spit, jumping on mosquitoes / wasps, hitbox interaction of spit + wasp 
@@ -165,6 +167,7 @@ typedef struct Flamespitter{
 	Rectangle hitbox;
 	// TODO: fields related to flame projectile
 	Status status;
+	Direction direction;
 	float spitCooldown;
 	bool isActive;
 } Flamespitter;
@@ -180,7 +183,7 @@ typedef struct Flameprojectile{
 } Flameprojectile;
 
 // initialize flamespitter
-void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, int activePads, int *activeFlamespitters, Texture2D flamespitter_texture) {
+void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, Frog *froggy, int activePads, int *activeFlamespitters, Texture2D flamespitter_texture) {
 	// spawn a flamespitter and place it ontop of a lilypad
 	int randomLily = GetRandomValue(0, activePads - 1);
 
@@ -191,10 +194,26 @@ void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, int activePads, int
 
 	flamey->texture = flamespitter_texture;
 	flamey->position = pads[randomLily].position;
+
+	// set initial direction
+	if (froggy->position.x > flamey->position.x) {
+		flamey->direction = RIGHT;
+	} else {
+		flamey->direction = LEFT;
+	}
+
 	flamey->status = ALIVE;
 	flamey->isActive = true;
 	flamey->spitCooldown = FLAME_SPITTER_SPIT_COOLDOWN;
 	(*activeFlamespitters)++;
+}
+
+void update_flamespitter_direction(Flamespitter *flamey, Frog *froggy) {
+	if (froggy->position.x > flamey->position.x) {
+		flamey->direction = RIGHT;
+	} else {
+		flamey->direction = LEFT;
+	}
 }
 
 // shoot a flame projectile at the location of the frog
@@ -235,6 +254,12 @@ void shoot_flameprojectile(Flamespitter *flamey, Flameprojectile *projectiles, F
 	}	
 }
 
+// apply velocity flame projectile
+void apply_flame_projectile_velocity(Flameprojectile *projectile, float frameTime) {
+	projectile->position.x += projectile->velocity.x * frameTime;
+	projectile->position.y += projectile->velocity.y * frameTime;
+}
+
 // deactivate dead and offscreen flamespitters
 void deactivate_flamespitter(Flamespitter *flamey, Frog *froggy) {
 	if (flamey->status == DEAD) {
@@ -261,8 +286,7 @@ void deactivate_flameprojectile(Flameprojectile *projectile, Frog *froggy) {
 }
 
 // frog flamespitter collisions
-void collision_check_flamespitter(Flamespitter *flamey, Frog *froggy, Bugspit *spitty) {
-	
+void collision_check_flamespitter(Flamespitter *flamey, Frog *froggy, Bugspit *spitty) {	
 	if (CheckCollisionRecs(flamey->hitbox, froggy->hitbox)) {
 		// if frog lands a jump on the flamespitter, kill it
 		if (froggy->position.y < flamey->position.y && froggy->isJumping) {
@@ -280,6 +304,46 @@ void collision_check_flameprojectile(Flameprojectile *projectile, Frog *froggy) 
 		froggy->health -= 1.5f;
 		froggy->isBurning = true;
 	}
+}
+
+// draw flamespitter
+void draw_flamespitter(Flamespitter *flamey) {	
+	DrawTextureRec(
+		flamey->texture,
+		(Rectangle){
+			0,
+			0,
+			flamey->texture.width,
+			flamey->texture.height
+		},
+		(Vector2){
+			flamey->position.x,
+			flamey->position.y
+		},
+		RAYWHITE);
+}	
+
+// draw flame projectiles
+void draw_flameprojectile(Flameprojectile *projectile) {	
+	DrawTexturePro(
+		projectile->texture,
+		(Rectangle){
+			0,
+			0,
+			projectile->texture.width,
+			projectile->texture.height
+		},
+		(Rectangle){
+			0,
+			0,
+			projectile->position.x,
+			projectile->position.y
+		},
+		(Vector2){ 0, 0},
+		// TODO: make sure this is in degrees
+		projectile->angle,
+		RAYWHITE
+	);
 }
 
 // flame projectile lights the frog on fire
@@ -1483,6 +1547,7 @@ void spawn_healing_heart(Heart *hearty, Texture2D heart_texture, Lilypad *pads, 
 	int randomValue = GetRandomValue(0, activePads - 1);
 
 	hearty->position = pads[randomValue].position;	
+	pads[randomValue].hasHeart = true;
 	hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
 	hearty->isEaten = false;
 }
