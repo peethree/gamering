@@ -66,6 +66,7 @@ typedef struct Frog {
     bool isJumping;
     bool isBouncing;
 	bool isPoisoned;
+	bool isBurning;
 	bool dropDown;
 } Frog;
 
@@ -121,6 +122,7 @@ typedef struct Lilypad{
 	bool isActive;
 	bool hasFishTrap;
 	bool hasHeart;
+	bool hasFlamespitter;
 } Lilypad;
 
 typedef struct Fish{
@@ -161,6 +163,8 @@ typedef struct Flamespitter{
 	Rectangle position;
 	Rectangle hitbox;
 	// TODO: fields related to flame projectile
+	Status status;
+	bool isActive;
 } Flamespitter;
 
 typedef struct Flameprojectile{
@@ -168,31 +172,75 @@ typedef struct Flameprojectile{
 	Rectangle position;
 	Rectangle hitbox;
 	Vector2 velocity;
+	bool isActive;
 	// TODO: aims at the frog
 } Flameprojectile;
 
-void spawn_flamespitter(Flamespitter *flamey, Lilypad *pad) {
+// initialize flamespitter
+void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, int activePads, int *activeFlamespitters, Texture2D flamespitter_texture) {
 	// spawn a flamespitter and place it ontop of a lilypad
+	int randomLily = GetRandomValue(0, activePads - 1);
+
+	// don't spawn on lilypads that already have a heart spawn.
+	if (pads[randomLily].hasHeart) {
+		return;
+	}
+
+	flamey->texture = flamespitter_texture;
+	flamey->position = pads[randomLily].position;
+	flamey->status = ALIVE;
+	flamey->isActive = true;
+	(*activeFlamespitters)++;
 }
 
+// shoot a flame projectile at the location of the frog
 void shoot_flameprojectile(Flameprojectile *projectile, Frog *froggy) {
-	// shoot a flame projectile at the location of the frog
+	
 }
 
-void deactivate_flamespitter(Flamespitter *flamey) {
-	// deactivate dead and offscreen flamespitters
+// deactivate dead and offscreen flamespitters
+void deactivate_flamespitter(Flamespitter *flamey, Frog *froggy) {
+	if (flamey->status == DEAD) {
+		flamey->isActive = false;
+	}
+
+	// if flamey is too far out of range (below) on y axis
+	if (flamey->isActive && (flamey->position.y > froggy->position.y + 1600.0f)) {
+		flamey->isActive = false;		
+	}
 }
 
-void deactivate_flameprojectile(Flameprojectile *projectile) {
-	// deactivate offscreen projectiles
+// deactivate offscreen projectiles
+void deactivate_flameprojectile(Flameprojectile *projectile, Frog *froggy) {
+	// too far offscreen on y axis
+	if (projectile->isActive && (projectile->position.y > froggy->position.y + 1600.0f || projectile->position.y < froggy->position.y - 1600.0f)) {
+		projectile->isActive = false;		
+	}
+
+	// too far offscreen on x axis
+	if (projectile->isActive && (projectile->position.x > 2000.0f || projectile->position.x < -1000.0f)) {
+		projectile->isActive = false;		
+	}
 }
 
+// frog flamespitter collisions
 void collision_check_flamespitter(Flamespitter *flamey, Frog *froggy, Bugspit *spitty) {
-	// frog hits flamespitter
+	// if frog lands a jump on the flamespitter, kill it
+
+	// if frog touches it in any other way, take damage
 }
 
+// frog gets hit by flame projectile
 void collision_check_flameprojectile(Flameprojectile *projectile, Frog *froggy) {
-	// frog gets hit by flame projectile
+	if (CheckCollisionRecs(froggy->hitbox, projectile->hitbox)) {
+		froggy->health -= 1.5f;
+		froggy->isBurning = true;
+	}
+}
+
+// flame projectile lights the frog on fire
+void burning_froggy(Frog *froggy) {
+	//
 }
 
 // gravity frog
@@ -1611,7 +1659,8 @@ int main () {
 		.isShooting = false,
 		.dropDown = false,		
 		.spitCooldown = 0.0f,
-		.isPoisoned = false
+		.isPoisoned = false,
+		.isBurning = false
 	};		
 
 	Texture2D duckhorde_texture = LoadTexture("duckhorde.png");
