@@ -8,7 +8,6 @@
 // add an enemy that spits fire at the frog, add a burning status for the frog similar to poison
 // consider adding sound effects for poison/ burning status 
 // add sound effect for bug spit, jumping on mosquitoes / wasps, hitbox interaction of spit + wasp 
-// work on proximity sounds based on distance away from the frog
 // look for a way to start audio files further in?
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
 // add an objective to win the game, princess frog way up high? space ship 2 fly away and escape the ducks?
@@ -100,12 +99,14 @@ typedef struct Bug{
 	bool isBuzzing;
 } Bug;
 
+bool buzzInUse[MAX_MOSQUITOES] = { false };
+
 typedef struct Bugspit{
 	Texture2D texture;
 	Rectangle hitbox;
 	Rectangle position;
 	Vector2 velocity;
-	Status status;
+	// Status status;
 	float angle;
 	bool isActive;		
 } Bugspit;
@@ -155,7 +156,44 @@ typedef struct Duckhorde{
 	// what else?
 } Duckhorde;
 
-bool buzzInUse[MAX_MOSQUITOES] = { false };
+typedef struct Flamespitter{
+	Texture2D texture;
+	Rectangle position;
+	Rectangle hitbox;
+	// TODO: fields related to flame projectile
+} Flamespitter;
+
+typedef struct Flameprojectile{
+	Texture2D texture;
+	Rectangle position;
+	Rectangle hitbox;
+	Vector2 velocity;
+	// TODO: aims at the frog
+} Flameprojectile;
+
+void spawn_flamespitter(Flamespitter *flamey, Lilypad *pad) {
+	// spawn a flamespitter and place it ontop of a lilypad
+}
+
+void shoot_flameprojectile(Flameprojectile *projectile, Frog *froggy) {
+	// shoot a flame projectile at the location of the frog
+}
+
+void deactivate_flamespitter(Flamespitter *flamey) {
+	// deactivate dead and offscreen flamespitters
+}
+
+void deactivate_flameprojectile(Flameprojectile *projectile) {
+	// deactivate offscreen projectiles
+}
+
+void collision_check_flamespitter(Flamespitter *flamey, Frog *froggy, Bugspit *spitty) {
+	// frog hits flamespitter
+}
+
+void collision_check_flameprojectile(Flameprojectile *projectile, Frog *froggy) {
+	// frog gets hit by flame projectile
+}
 
 // gravity frog
 void apply_gravity(Frog *froggy) {	
