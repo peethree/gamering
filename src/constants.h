@@ -67,11 +67,12 @@
 
 // flamespitters
 #define MAX_FLAMESPITTERS 2
-#define FLAME_SPITTER_SPIT_COOLDOWN 0.3f
+#define FLAME_SPITTER_SPIT_COOLDOWN 1.0f
+#define FLAME_SPITTER_HEALTH 100.0f
 
 // flameprojectiles
-#define MAX_FLAMEPROJECTILES 10
-#define FLAME_PROJECTILE_SPEED 300.0f
+#define MAX_FLAMEPROJECTILES 100
+#define FLAME_PROJECTILE_SPEED 900.0f
 
 // proximity volume
 // TODO: 

@@ -160,6 +160,7 @@ typedef struct Duckhorde{
 	// what else?
 } Duckhorde;
 
+// can this be initialized as a Bug? yes, but do I want to ?
 typedef struct Flamespitter{
 	Texture2D texture;
 	Rectangle position;
@@ -169,6 +170,7 @@ typedef struct Flamespitter{
 	Status status;
 	Direction direction;
 	float spitCooldown;
+	float health;
 	bool isActive;
 } Flamespitter;
 
@@ -191,6 +193,8 @@ void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, Frog *froggy, int a
 	if (pads[randomLily].hasHeart) {
 		return;
 	}
+	
+	// TODO: don't spawn on lilypad that's offscreen, maybe change lilypad spawn logic?
 
 	flamey->texture = flamespitter_texture;
 	flamey->position = pads[randomLily].position;
@@ -205,6 +209,7 @@ void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, Frog *froggy, int a
 	flamey->status = ALIVE;
 	flamey->isActive = true;
 	flamey->spitCooldown = FLAME_SPITTER_SPIT_COOLDOWN;
+	flamey->health = FLAME_SPITTER_HEALTH;
 	(*activeFlamespitters)++;
 }
 
@@ -216,48 +221,75 @@ void update_flamespitter_direction(Flamespitter *flamey, Frog *froggy) {
 	}
 }
 
+bool target_spotted(Flamespitter *flamey, Camera2D camera) {
+	// top-left corner of the camera in world coordinates
+    Vector2 camCoords = GetScreenToWorld2D((Vector2){ 0, 0 }, camera);
+
+    Rectangle cameraView = {
+        camCoords.x,                
+        camCoords.y,               
+        1280,                         
+        800                           
+    };
+
+    // check if froggy is inside camera view
+    return CheckCollisionRecs(flamey->position, cameraView);
+}
+
 // shoot a flame projectile at the location of the frog
-void shoot_flameprojectile(Flamespitter *flamey, Flameprojectile *projectiles, Frog *froggy, int *activeProjectiles, Texture2D flameprojectile_texture, float frameTime) {
-	float dx = flamey->position.x - froggy->position.x;
-	float dy = flamey->position.y - froggy->position.y;
+void shoot_flameprojectile(Flamespitter *flamey, Flameprojectile *projectiles, Frog *froggy, int *activeProjectiles, Texture2D flameprojectile_texture, float frameTime, Camera2D camera) {
+	// only start blasting at the frog when he's in view
+	if (target_spotted(flamey, camera)) {
+		float dx = flamey->position.x - froggy->position.x;
+		float dy = flamey->position.y - froggy->position.y;
 
-	// the angle of the projectile
-	float angle = atan2f(dy, dx);
-	Vector2 direction = { cosf(angle), sinf(angle) };
-	
-	// decrement spit cooldown
-	flamey->spitCooldown -= frameTime;
+		// the angle of the projectile
+		float angle = atan2f(dy, dx);
+		Vector2 direction = { cosf(angle), sinf(angle) };
+		
+		// decrement spit cooldown
+		if (flamey->spitCooldown > 0) {
+			flamey->spitCooldown -= frameTime;
+		}
 
-	if (flamey->spitCooldown < EPSILON) {
-		// initialize new projectile
-		projectiles[*activeProjectiles] = (Flameprojectile){
-			.position = flamey->mouthPosition,
-			.hitbox = (Rectangle){
-				0,
-				0,
-				10.0f,
-				10.0f
-			},
-			.isActive = true,
-			.velocity = (Vector2){
-				direction.x * FLAME_PROJECTILE_SPEED,
-				direction.y * FLAME_PROJECTILE_SPEED
-			},
-			.texture = flameprojectile_texture,
-			.angle = angle * RAD2DEG
-		};
+		if (flamey->spitCooldown < EPSILON && (*activeProjectiles) < MAX_FLAMEPROJECTILES) {
+			// reset cooldown
+			flamey->spitCooldown = FLAME_SPITTER_SPIT_COOLDOWN + (float)(GetRandomValue(0,50) / 100.0f);
 
-		// +1 to active projectiles
-		(*activeProjectiles)++;
-		// reset cooldown
-		flamey->spitCooldown = FLAME_SPITTER_SPIT_COOLDOWN;
-	}	
+			// initialize new projectile
+			projectiles[*activeProjectiles] = (Flameprojectile){
+				.position = flamey->position,
+				.hitbox = (Rectangle){
+					0,
+					0,
+					10.0f,
+					10.0f
+				},
+				.isActive = true,
+				.velocity = (Vector2){
+					direction.x * FLAME_PROJECTILE_SPEED,
+					direction.y * FLAME_PROJECTILE_SPEED
+				},
+				.texture = flameprojectile_texture,
+				.angle = angle * RAD2DEG
+			};
+
+			// +1 to active projectiles
+			(*activeProjectiles)++;	
+		}	
+	}		
 }
 
 // apply velocity flame projectile
 void apply_flame_projectile_velocity(Flameprojectile *projectile, float frameTime) {
-	projectile->position.x += projectile->velocity.x * frameTime;
-	projectile->position.y += projectile->velocity.y * frameTime;
+	projectile->position.x -= projectile->velocity.x * frameTime;
+	projectile->position.y -= projectile->velocity.y * frameTime;
+}
+
+void flamespitter_death(Flamespitter *flamey) {	
+	if (flamey->health <= 0) {
+		flamey->status = DEAD;
+	}
 }
 
 // deactivate dead and offscreen flamespitters
@@ -286,16 +318,40 @@ void deactivate_flameprojectile(Flameprojectile *projectile, Frog *froggy) {
 }
 
 // frog flamespitter collisions
-void collision_check_flamespitter(Flamespitter *flamey, Frog *froggy, Bugspit *spitty) {	
+void collision_check_flamespitter(Flamespitter *flamey, Frog *froggy) {	
 	if (CheckCollisionRecs(flamey->hitbox, froggy->hitbox)) {
 		// if frog lands a jump on the flamespitter, kill it
 		if (froggy->position.y < flamey->position.y && froggy->isJumping) {
-			flamey->status == DEAD;
+			flamey->status = DEAD;
 		// else take damage
 		} else {
 			froggy->health -= 1.0f;
 		}
 	}	
+}
+
+void collision_check_spitties_flamespitter(Bugspit *spitty, Flamespitter *flamey) {
+	if (CheckCollisionRecs(spitty->hitbox, flamey->hitbox)) {
+		flamey->health -= 50.0f;
+	}
+}
+
+void hitbox_flamespitter(Flamespitter *flamey) {
+	flamey->hitbox = (Rectangle){
+		flamey->position.x,
+		flamey->position.y,
+		100.0,
+		100.0
+	};
+}
+
+void hitbox_flameprojectile(Flameprojectile *projectile) {
+	projectile->hitbox = (Rectangle){
+		projectile->position.x,
+		projectile->position.y,
+		25.0,
+		25.0
+	};
 }
 
 // frog gets hit by flame projectile
@@ -306,6 +362,7 @@ void collision_check_flameprojectile(Flameprojectile *projectile, Frog *froggy) 
 	}
 }
 
+// TODO: take direction into account
 // draw flamespitter
 void draw_flamespitter(Flamespitter *flamey) {	
 	DrawTextureRec(
@@ -313,7 +370,8 @@ void draw_flamespitter(Flamespitter *flamey) {
 		(Rectangle){
 			0,
 			0,
-			flamey->texture.width,
+			// flip texture logic
+			flamey->texture.width * ((flamey->direction == LEFT) ? -1 : 1),
 			flamey->texture.height
 		},
 		(Vector2){
@@ -333,11 +391,11 @@ void draw_flameprojectile(Flameprojectile *projectile) {
 			projectile->texture.width,
 			projectile->texture.height
 		},
-		(Rectangle){
-			0,
-			0,
+		(Rectangle){				
 			projectile->position.x,
-			projectile->position.y
+			projectile->position.y,
+			projectile->texture.width,
+			projectile->texture.height
 		},
 		(Vector2){ 0, 0},
 		// TODO: make sure this is in degrees
@@ -743,7 +801,7 @@ void collision_check_spit(Bugspit *spitty, Bug *bug) {
 		// oneshot
 		} else if (bug->type = "mosquito") {
 			bug->health -= 1.0;
-		}		
+		} 	
 	}
 }
 
@@ -765,7 +823,7 @@ void draw_spit(Bugspit *spitty) {
 }
 
 // apply velocity to spit projectile
-void spit_velocity(Bugspit *spitty, float frameTime) {
+void apply_spit_velocity(Bugspit *spitty, float frameTime) {
 	spitty->position.x += spitty->velocity.x * frameTime;
 	spitty->position.y += spitty->velocity.y * frameTime;
 }
@@ -1803,6 +1861,9 @@ int main () {
 	Texture2D fish_texture = LoadTexture("fish.png");
 	Texture2D bugspit_texture = LoadTexture("bugspit.png");
 	Texture2D heart_texture = LoadTexture("heart.png");
+	// untill i find a better texture, placeholder for testing
+	Texture2D flamespitter_texture = LoadTexture("placeholder.png");
+	Texture2D flameprojectile_texture = LoadTexture("placeholder_spit.png");
 	
 	// max distance for sounds
 	float maxDistance = sqrt(SCREEN_WIDTH * SCREEN_WIDTH + SCREEN_HEIGHT * SCREEN_HEIGHT); 
@@ -1922,6 +1983,11 @@ int main () {
 			activeHearts++;
 		}
 
+		// spawn flamespitters
+		if (activeFlamespitters < MAX_FLAMESPITTERS) {
+			spawn_flamespitter(&flameys[activeFlamespitters], pads, &froggy, activePads, &activeFlamespitters, flamespitter_texture);
+		}
+
 		// frog updates
 		frog_color(&froggy, frameTime);
 		frog_reset_jumpstatus(&froggy);
@@ -1952,7 +2018,7 @@ int main () {
 		int activeSpitAfterLoop = 0;
 		for (int i = 0; i < activeSpit; i++) {
 			hitbox_spit(&spitties[i]);
-			spit_velocity(&spitties[i], frameTime);
+			apply_spit_velocity(&spitties[i], frameTime);
 			deactivate_spit(&spitties[i], &froggy);
 
 			if (spitties[i].isActive) {
@@ -2053,6 +2119,40 @@ int main () {
 			}	
 		}
 		activeFish = activeFishAfterLoop;	
+
+		// update flamespitters
+		int activeFlamespittersAfterLoop = 0;
+		for (int i = 0; i < activeFlamespitters; i++) {	
+			update_flamespitter_direction(&flameys[i], &froggy);
+			hitbox_flamespitter(&flameys[i]);
+			collision_check_flamespitter(&flameys[i], &froggy);	
+			flamespitter_death(&flameys[i]);
+
+			for (int j = 0; j < activeSpit; j++) {
+				collision_check_spitties_flamespitter(&spitties[j], &flameys[i]);
+			}			
+
+			shoot_flameprojectile(&flameys[i], projectiles, &froggy, &activeFlameprojectiles, flameprojectile_texture, frameTime, camera);
+			deactivate_flamespitter(&flameys[i], &froggy);
+
+			if (flameys[i].isActive) {
+				flameys[activeFlamespittersAfterLoop++] = flameys[i];
+			}	
+		}
+		activeFlamespitters = activeFlamespittersAfterLoop;
+
+		int activeFlameprojectilesAfterLoop = 0;
+		for (int i = 0; i < activeFlameprojectiles; i++) {
+			apply_flame_projectile_velocity(&projectiles[i], frameTime);
+			deactivate_flameprojectile(&projectiles[i], &froggy);
+			hitbox_flameprojectile(&projectiles[i]);
+			collision_check_flameprojectile(&projectiles[i], &froggy);
+
+			if (projectiles[i].isActive) {
+				projectiles[activeFlameprojectilesAfterLoop++] = projectiles[i];
+			}	
+		}
+		activeFlameprojectiles = activeFlameprojectilesAfterLoop;
 
 		// if froggy below ground, put it back on ground
     	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
@@ -2171,8 +2271,7 @@ int main () {
 		}
 
 		// draw mosquitoes
-		for (int i = 0; i < activeMosquitoes; i++) {									
-
+		for (int i = 0; i < activeMosquitoes; i++) {				
 			// annoying twitching animation by scaling it from 90 / 100% size every frame :thumbs_up:
 			DrawTexturePro(
 				mosquitoes[i].texture,
@@ -2217,6 +2316,17 @@ int main () {
 			// DrawRectangleLinesEx(wasps[i].hitbox, 1, RED); 
 		}
 
+		// draw flamespitters
+		for (int i = 0; i < activeFlamespitters; i++) {
+			draw_flamespitter(&flameys[i]);
+			DrawRectangleLinesEx(flameys[i].hitbox, 1, WHITE); 
+		}
+
+		// draw flame projectiles
+		for (int i = 0; i < activeFlameprojectiles; i++) {			
+			draw_flameprojectile(&projectiles[i]);
+		}
+
 		// draw duckhorde
 		draw_duckhorde_water(&duckies);
 		draw_duckhorde(&duckies);
@@ -2256,6 +2366,8 @@ int main () {
 		DrawText(TextFormat("drowdown: %d", froggy.dropDown), 10, 640, 20, WHITE);
 		DrawText(TextFormat("isJumping: %d", froggy.isJumping), 10, 670, 20, WHITE);
 		DrawText(TextFormat("duckies pos: %.2f", duckies.position.y), 10, 700, 20, WHITE);
+		DrawText(TextFormat("active flame proj: %d", activeFlameprojectiles), 10, 730, 20, WHITE);
+		DrawText(TextFormat("active flame spitters: %d", activeFlamespitters), 10, 760, 20, WHITE);
 
 		// :-C		
 		if (froggy.status == DEAD) {
@@ -2279,6 +2391,8 @@ int main () {
 	UnloadTexture(bugspit_texture);
 	UnloadTexture(heart_texture);
 	UnloadTexture(duckhorde_texture);
+	UnloadTexture(flamespitter_texture);
+	UnloadTexture(flameprojectile_texture);
 
 	// unload sounds (should be MAX_MOSQUITOES)
 	for (int i = 0; i < activeBuzzes; i++) {
