@@ -6,8 +6,8 @@
 
 // TODO: 
 // make a texture for flame spitter / flame projectile
-// call flamespitter / projectile functions in gameplayloop
-// add an enemy that spits fire at the frog, add a burning status for the frog similar to poison
+// make the cooldown independant per sprite
+// add a burning status for the frog similar to poison, draw flame behind the froggy?
 // consider adding sound effects for poison/ burning status 
 // add sound effect for bug spit, jumping on mosquitoes / wasps, hitbox interaction of spit + wasp 
 // look for a way to start audio files further in?
@@ -262,6 +262,7 @@ void shoot_flameprojectile(Flamespitter *flamey, Flameprojectile *projectiles, F
 				.hitbox = (Rectangle){
 					0,
 					0,
+					// TODO: consider the actual dimensions of the projectile
 					10.0f,
 					10.0f
 				},
@@ -1915,9 +1916,10 @@ int main () {
 		create_mosquito_buzz_instance(sound_path_mosquito_buzz, buzzes, &activeBuzzes);
 	}
 
-	// bug spawntimer
+	// spawntimers
 	float mosquitoSpawnTimer = MOSQUITO_SPAWN_TIMER;		
-	float waspSpawnTimer = WASP_SPAWN_TIMER;	
+	float waspSpawnTimer = WASP_SPAWN_TIMER;
+	float heartSpawnTimer = HEART_SPAWN_TIMER;
 
 	// lilipad init
 	Texture2D lilypad_texture = LoadTexture("lilipads.png");	
@@ -1938,6 +1940,7 @@ int main () {
 
 		mosquitoSpawnTimer += frameTime;
 		waspSpawnTimer += frameTime;
+		heartSpawnTimer += frameTime;
 
 		// spawn mosquitoes 
 		if (mosquitoSpawnTimer >= MOSQUITO_SPAWN_INTERVAL && activeMosquitoes < MAX_MOSQUITOES) {
@@ -1952,6 +1955,14 @@ int main () {
 			activeWasps++;
 			waspSpawnTimer = 0.0f;
 		}		
+
+		// spawn hearts
+		if (heartSpawnTimer >= 0 && activeHearts < MAX_HEARTS) {
+			spawn_healing_heart(&hearties[activeHearts], heart_texture, pads, activePads);
+			activeHearts++;
+			// TODO: add some randomization to heart spawn timer
+			heartSpawnTimer = HEART_SPAWN_TIMER;
+		}
 	
 		// make initial pads to jump on		
 		if (activePads < 40) {
@@ -1975,12 +1986,6 @@ int main () {
 		if (activeFish < MAX_FISH) {			
 			spawn_fish(&fishies[activeFish], fish_texture, pads, activePads);
 			activeFish++;		
-		}
-
-		// spawn hearts
-		if (activeHearts < MAX_HEARTS) {
-			spawn_healing_heart(&hearties[activeHearts], heart_texture, pads, activePads);
-			activeHearts++;
 		}
 
 		// spawn flamespitters

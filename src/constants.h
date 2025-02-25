@@ -1,8 +1,8 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#define SCREEN_WIDTH 1280.0
-#define SCREEN_HEIGHT 800.0
+#define SCREEN_WIDTH 1280.0f
+#define SCREEN_HEIGHT 800.0f
 
 // mosquito
 #define MAX_MOSQUITOES 10
@@ -36,19 +36,21 @@
 
 // heart
 #define MAX_HEARTS 1
+// don't spawn until x time into the game
+#define HEART_SPAWN_TIMER -30.0f
 
 // lilly pads
 #define MAX_LILLYPADS 1000
 #define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
 
 // froggy
-#define FROGGY_HEALTH 1000000.0
-#define FROGGY_VELOCITY_X 200.0
-#define FROGGY_JUMP_VELOCITY_Y 1300.0
-#define FROGGY_JUMP_VELOCITY_X 380.0
+#define FROGGY_HEALTH 1000000.0f
+#define FROGGY_VELOCITY_X 200.0f
+#define FROGGY_JUMP_VELOCITY_Y 1300.0f
+#define FROGGY_JUMP_VELOCITY_X 380.0f
 #define FROGGY_BUMP_VELOCITY_Y 825
 // #define FROGGY_BUMP_VELOCITY_X 380.0
-#define FROGGY_FALL_VELOCITY 450.0 // if this value is changed, check lilypad collision function
+#define FROGGY_FALL_VELOCITY 450.0f// if this value is changed, check lilypad collision function
 #define FROGGY_TONGUE_LENGTH 480.0f 
 #define FROGGY_ATTACK_DURATION 2.0f
 #define FROGGY_TONGUE_WIDTH 5.0f
