@@ -1390,12 +1390,14 @@ void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *frog
 	pad->despawnTimer = 0.0f;
 }
 
-void deactivate_lilypads(Lilypad *pad, Frog *froggy) {
+void update_froggy_highest_position(Frog *froggy) {
 	// get the highest y value visited
 	if (froggy->position.y < froggy->highestPosition) {
         froggy->highestPosition = froggy->position.y;
     }
+}
 
+void deactivate_lilypads(Lilypad *pad, Frog *froggy) {
 	// remove lilypads when froggy has climbed certain distance
     if (pad->isActive && pad->position.y > froggy->highestPosition + 1500.0f) {
         pad->isActive = false;
@@ -1596,19 +1598,33 @@ void deactivate_fish(Fish *fishy, Frog *froggy, float frameTime) {
 	}
 }
 
-void spawn_healing_heart(Heart *hearty, Texture2D heart_texture, Lilypad *pads, int activePads) {
-	// TODO: put on a cooldown
+void spawn_healing_heart(Heart *hearty, Texture2D heart_texture, Lilypad *pads, int activePads, Frog *froggy) {
 	hearty->texture = heart_texture;
-	// NEEDS to be quite rare/ can be on a random timer
+
 	// hearty->frame = 0;
+	// spawn at (somewhat) random lily location 
+	int padsAboveFroggy[MAX_LILLYPADS];
+	int count = 0;
 
-	// spawn at random lily location
-	int randomValue = GetRandomValue(0, activePads - 1);
+	for (int i = 0; i < activePads; i++) {
+		// (must be ABOVE the frog)
+		if (pads[i].position.y < froggy->highestPosition) {
+			padsAboveFroggy[count++] = i;
+		}
+	}
 
-	hearty->position = pads[randomValue].position;	
-	pads[randomValue].hasHeart = true;
-	hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
-	hearty->isEaten = false;
+	// choose 1 pad from the pads above froggy array to spawn a heart on
+	if (count > 0) {
+		// random index based on how many pads were above the frog's heighest reached y value
+		int index = GetRandomValue(0, count - 1);
+		// using the random padsAboveFroggy index in the (actual) pads array
+		int padsIndex = padsAboveFroggy[index];		
+		// set the heart's position
+		hearty->position = pads[padsIndex].position;
+		pads[padsIndex].hasHeart = true;
+		hearty->isActive = true; // set to inactive when froggy interacts with it and uses it
+		hearty->isEaten = false;
+	}
 }
 
 // update heart hitbox
@@ -1958,10 +1974,10 @@ int main () {
 
 		// spawn hearts
 		if (heartSpawnTimer >= 0 && activeHearts < MAX_HEARTS) {
-			spawn_healing_heart(&hearties[activeHearts], heart_texture, pads, activePads);
+			spawn_healing_heart(&hearties[activeHearts], heart_texture, pads, activePads, &froggy);
 			activeHearts++;
-			// TODO: add some randomization to heart spawn timer
-			heartSpawnTimer = HEART_SPAWN_TIMER;
+			// add some randomization to heart spawn timer
+			heartSpawnTimer = HEART_SPAWN_TIMER - (float)GetRandomValue(0,10);
 		}
 	
 		// make initial pads to jump on		
@@ -2014,6 +2030,7 @@ int main () {
 		froggy_death(&froggy);
 		froggy_duckhorde_collision(&froggy, &duckies);
 		update_duckhorde_position(&duckies, &froggy);
+		update_froggy_highest_position(&froggy);
 
 		// duckhorde updates
 		hitbox_duckhorde(&duckies);

@@ -37,7 +37,7 @@
 // heart
 #define MAX_HEARTS 1
 // don't spawn until x time into the game
-#define HEART_SPAWN_TIMER -30.0f
+#define HEART_SPAWN_TIMER -1.0f
 
 // lilly pads
 #define MAX_LILLYPADS 1000
