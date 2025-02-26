@@ -6,10 +6,10 @@
 
 // TODO: 
 // make a texture for flame spitter / flame projectile
-// make the cooldown independant per sprite
+// make the flame projectile spit cooldown independant per sprite
 // add a burning status for the frog similar to poison, draw flame behind the froggy?
 // consider adding sound effects for poison/ burning status 
-// add sound effect for bug spit, jumping on mosquitoes / wasps, hitbox interaction of spit + wasp 
+// add sound effect for bug spit, jumping on mosquitoes / wasps, hitbox interaction of spit + wasp, a fading lily pad 
 // look for a way to start audio files further in?
 // instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
 // add an objective to win the game, princess frog way up high? space ship 2 fly away and escape the ducks?
@@ -1617,7 +1617,7 @@ void spawn_healing_heart(Heart *hearty, Texture2D heart_texture, Lilypad *pads, 
 	if (count > 0) {
 		// random index based on how many pads were above the frog's heighest reached y value
 		int index = GetRandomValue(0, count - 1);
-		// using the random padsAboveFroggy index in the (actual) pads array
+		// using the random index in padsAboveFroggy's array of indices to get a valid pads index that is above the frog's heighest visited y value
 		int padsIndex = padsAboveFroggy[index];		
 		// set the heart's position
 		hearty->position = pads[padsIndex].position;

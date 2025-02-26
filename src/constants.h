@@ -1,88 +1,89 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#define SCREEN_WIDTH 1280.0f
-#define SCREEN_HEIGHT 800.0f
+extern const float SCREEN_WIDTH;
+extern const float SCREEN_HEIGHT; 
 
 // mosquito
 #define MAX_MOSQUITOES 10
-#define MOSQUITO_SPAWN_INTERVAL 0.5f
-#define MOSQUITO_SPAWN_TIMER 0.0f
-#define MOSQUITO_VELOCITY_X 400.0f
-#define MOSQUITO_WAVE_AMPLITUDE 60.0f
-#define MOSQUITO_WAVE_FREQUENCY 5.0f
-#define MOSQUITO_VELOCITY_DEATH_FALL 360.0f
+extern const float MOSQUITO_SPAWN_INTERVAL; 
+extern const float MOSQUITO_SPAWN_TIMER; 
+extern const float MOSQUITO_VELOCITY_X;
+extern const float MOSQUITO_WAVE_AMPLITUDE;
+extern const float MOSQUITO_WAVE_FREQUENCY;
+extern const float MOSQUITO_VELOCITY_DEATH_FALL; 
 
 // wasp
 #define MAX_WASPS 10
-#define WASP_POISON_DURATION 8.0f
-#define WASP_SPAWN_INTERVAL 5.0f
-#define WASP_SPAWN_TIMER -5.0f
-#define WASP_VELOCITY_DEATH_FALL 460.0f
-#define WASP_RADIUS_MIN 500
-#define WASP_RADIUS_MAX 700
-#define WASP_SPIRAL_SPEED_MIN 1
-#define WASP_SPIRAL_SPEED_MAX 3
-#define WASP_CONVERGENCE_MIN 12
-#define WASP_CONVERGENCE_MAX 18
-#define WASP_CLOSEST_RADIUS 3.0f
+extern const float WASP_POISON_DURATION; 
+extern const float WASP_SPAWN_INTERVAL; 
+extern const float WASP_SPAWN_TIMER; 
+extern const float WASP_VELOCITY_DEATH_FALL; 
+extern const int WASP_RADIUS_MIN; 
+extern const int WASP_RADIUS_MAX; 
+extern const int WASP_SPIRAL_SPEED_MIN;
+extern const int WASP_SPIRAL_SPEED_MAX;
+extern const int WASP_CONVERGENCE_MIN; 
+extern const int WASP_CONVERGENCE_MAX; 
+extern const float WASP_CLOSEST_RADIUS;
 
 // fish
 #define MAX_FISH 5
-#define FISH_MIN_SIZE 1
-#define FISH_MAX_SIZE 3
-#define FISH_ATTACK_DURATION 1.4f
-#define FISH_ATTACK_DAMAGE 0.15f
+extern const int FISH_MIN_SIZE;
+extern const int FISH_MAX_SIZE;
+extern const float FISH_ATTACK_DURATION;
+extern const float FISH_ATTACK_DAMAGE;
 
 // heart
 #define MAX_HEARTS 1
+
 // don't spawn until x time into the game
-#define HEART_SPAWN_TIMER -1.0f
+extern const float HEART_SPAWN_TIMER;
 
 // lilly pads
 #define MAX_LILLYPADS 1000
-#define OFFSCREEN_LILYPAD_SPAWN_AMOUNT 12
+extern const int OFFSCREEN_LILYPAD_SPAWN_AMOUNT;
 
 // froggy
-#define FROGGY_HEALTH 1000000.0f
-#define FROGGY_VELOCITY_X 200.0f
-#define FROGGY_JUMP_VELOCITY_Y 1300.0f
-#define FROGGY_JUMP_VELOCITY_X 380.0f
-#define FROGGY_BUMP_VELOCITY_Y 825
+extern const float FROGGY_HEALTH;
+extern const float FROGGY_VELOCITY_X;
+extern const float FROGGY_JUMP_VELOCITY_Y;
+extern const float FROGGY_JUMP_VELOCITY_X;
+extern const int FROGGY_BUMP_VELOCITY_Y;
 // #define FROGGY_BUMP_VELOCITY_X 380.0
-#define FROGGY_FALL_VELOCITY 450.0f// if this value is changed, check lilypad collision function
-#define FROGGY_TONGUE_LENGTH 480.0f 
-#define FROGGY_ATTACK_DURATION 2.0f
-#define FROGGY_TONGUE_WIDTH 5.0f
-#define FROGGY_TONGUE_TIMER 2.0f
-#define FROGGY_TONGUE_BUG_PULL_SPEED 1100.0f
-#define FROGGY_BUG_SPIT_DISTANCE 1500.0f
-#define FROGGY_BUG_SPIT_SPEED 999.0f
+extern const float FROGGY_FALL_VELOCITY; // if this value is changed, check lilypad collision function
+extern const float FROGGY_TONGUE_LENGTH;  
+extern const float FROGGY_ATTACK_DURATION;
+extern const float FROGGY_TONGUE_WIDTH;
+extern const float FROGGY_TONGUE_TIMER;
+extern const float FROGGY_TONGUE_BUG_PULL_SPEED;
+extern const float FROGGY_BUG_SPIT_DISTANCE;
+extern const float FROGGY_BUG_SPIT_SPEED;
+
 #define FROGGY_MAX_BUG_SPIT 10
-#define FROGGY_BUG_SPIT_COOLDOWN 0.1f
-#define FROGGY_BUG_SPIT_TIMER 0.0f
+extern const float FROGGY_BUG_SPIT_COOLDOWN;
+extern const float FROGGY_BUG_SPIT_TIMER;
 
 // duckhorde
-#define DUCKHORDE_UPWARD_VELOCITY 1.0f
-#define DUCKHORDE_WAVELENGTH 100.0f
-#define DUCKHORDE_WAVE_AMPLITUDE 4.0f
+extern const float DUCKHORDE_UPWARD_VELOCITY;
+extern const float DUCKHORDE_WAVELENGTH;
+extern const float DUCKHORDE_WAVE_AMPLITUDE;
 
 // flamespitters
 #define MAX_FLAMESPITTERS 2
-#define FLAME_SPITTER_SPIT_COOLDOWN 1.0f
-#define FLAME_SPITTER_HEALTH 100.0f
+extern const float FLAME_SPITTER_SPIT_COOLDOWN;
+extern const float FLAME_SPITTER_HEALTH;
 
 // flameprojectiles
 #define MAX_FLAMEPROJECTILES 100
-#define FLAME_PROJECTILE_SPEED 900.0f
+extern const float FLAME_PROJECTILE_SPEED;
 
 // proximity volume
-// TODO: 
-#define VOLUME_MAX_DISTANCE 10.0f
-#define VOLUME_MIN_DISTANCE 1.0f
-#define MAX_VOLUME 1.0f
-#define MIN_VOLUME 0.0f
+extern const float VOLUME_MAX_DISTANCE;
+extern const float VOLUME_MIN_DISTANCE;
+extern const float MAX_VOLUME;
+extern const float MIN_VOLUME;
 
-#define EPSILON 0.0001f
+extern const float EPSILON;
 
 #endif
