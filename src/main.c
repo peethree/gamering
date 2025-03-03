@@ -11,7 +11,7 @@
 // consider adding sound effects for poison/ burning status 
 // add sound effect for bug spit, jumping on mosquitoes / wasps, hitbox interaction of spit + wasp, a fading lily pad 
 // look for a way to start audio files further in?
-// instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog
+// instead of looping over every lilypad for collision checks with frog, only check the ones in range of the frog?
 // add an objective to win the game, princess frog way up high? space ship 2 fly away and escape the ducks?
 // change the wasp sprite
 // delay the tongue swipe speed
@@ -26,11 +26,13 @@
 // cool backgrounds, stages that change depending on y value
 // stage 1: pond, stage 5: space, astronaut frog ???
 
+// used for flipping textures from left to right
 typedef enum Direction {
 	LEFT = -1,
 	RIGHT = 1,
 } Direction;
 
+// used for flipping textures upside down 
 typedef enum Status{	
 	ALIVE = 1,
 	DEAD = -1,
@@ -102,6 +104,7 @@ typedef struct Bug{
 	bool isBuzzing;
 } Bug;
 
+// array used to keep track of which loaded sound is in use
 bool buzzInUse[MAX_MOSQUITOES] = { false };
 
 typedef struct Bugspit{
@@ -195,6 +198,7 @@ void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, Frog *froggy, int a
 	}
 	
 	// TODO: don't spawn on lilypad that's offscreen, maybe change lilypad spawn logic?
+	// look at heart spawn logic, apply something similar to flamespitters
 
 	flamey->texture = flamespitter_texture;
 	flamey->position = pads[randomLily].position;
@@ -213,6 +217,7 @@ void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, Frog *froggy, int a
 	(*activeFlamespitters)++;
 }
 
+// update the direction the flamespitter is facing based on position of the frog
 void update_flamespitter_direction(Flamespitter *flamey, Frog *froggy) {
 	if (froggy->position.x > flamey->position.x) {
 		flamey->direction = RIGHT;
@@ -221,6 +226,7 @@ void update_flamespitter_direction(Flamespitter *flamey, Frog *froggy) {
 	}
 }
 
+// checks to see whether the froggy is in range / sight of the the flamespitter unit
 bool target_spotted(Flamespitter *flamey, Camera2D camera) {
 	// top-left corner of the camera in world coordinates
     Vector2 camCoords = GetScreenToWorld2D((Vector2){ 0, 0 }, camera);
@@ -228,11 +234,9 @@ bool target_spotted(Flamespitter *flamey, Camera2D camera) {
     Rectangle cameraView = {
         camCoords.x,                
         camCoords.y,               
-        1280,                         
-        800                           
+        1280.0f,                         
+        800.0f                           
     };
-
-    // check if froggy is inside camera view
     return CheckCollisionRecs(flamey->position, cameraView);
 }
 
@@ -260,8 +264,8 @@ void shoot_flameprojectile(Flamespitter *flamey, Flameprojectile *projectiles, F
 			projectiles[*activeProjectiles] = (Flameprojectile){
 				.position = flamey->position,
 				.hitbox = (Rectangle){
-					0,
-					0,
+					0.0f,
+					0.0f,
 					// TODO: consider the actual dimensions of the projectile
 					10.0f,
 					10.0f
@@ -288,7 +292,7 @@ void apply_flame_projectile_velocity(Flameprojectile *projectile, float frameTim
 }
 
 void flamespitter_death(Flamespitter *flamey) {	
-	if (flamey->health <= 0) {
+	if (flamey->health <= 0.0f) {
 		flamey->status = DEAD;
 	}
 }
@@ -341,8 +345,8 @@ void hitbox_flamespitter(Flamespitter *flamey) {
 	flamey->hitbox = (Rectangle){
 		flamey->position.x,
 		flamey->position.y,
-		100.0,
-		100.0
+		100.0f,
+		100.0f
 	};
 }
 
@@ -350,8 +354,8 @@ void hitbox_flameprojectile(Flameprojectile *projectile) {
 	projectile->hitbox = (Rectangle){
 		projectile->position.x,
 		projectile->position.y,
-		25.0,
-		25.0
+		25.0f,
+		25.0f
 	};
 }
 
@@ -369,11 +373,11 @@ void draw_flamespitter(Flamespitter *flamey) {
 	DrawTextureRec(
 		flamey->texture,
 		(Rectangle){
-			0,
-			0,
+			0.0f,
+			0.0f,
 			// flip texture logic
-			flamey->texture.width * ((flamey->direction == LEFT) ? -1 : 1),
-			flamey->texture.height
+			(float)flamey->texture.width * ((flamey->direction == LEFT) ? -1 : 1),
+			(float)flamey->texture.height
 		},
 		(Vector2){
 			flamey->position.x,
@@ -387,18 +391,18 @@ void draw_flameprojectile(Flameprojectile *projectile) {
 	DrawTexturePro(
 		projectile->texture,
 		(Rectangle){
-			0,
-			0,
-			projectile->texture.width,
-			projectile->texture.height
+			0.0f,
+			0.0f,
+			(float)projectile->texture.width,
+			(float)projectile->texture.height
 		},
 		(Rectangle){				
 			projectile->position.x,
 			projectile->position.y,
-			projectile->texture.width,
-			projectile->texture.height
+			(float)projectile->texture.width,
+			(float)projectile->texture.height
 		},
-		(Vector2){ 0, 0},
+		(Vector2){ 0.0f, 0.0f},
 		// TODO: make sure this is in degrees
 		projectile->angle,
 		RAYWHITE
@@ -412,7 +416,7 @@ void burning_froggy(Frog *froggy) {
 
 // gravity frog
 void apply_gravity(Frog *froggy) {	
-	froggy->velocity.y += 36.0;
+	froggy->velocity.y += 36.0f;
 	if (froggy->velocity.y > FROGGY_FALL_VELOCITY) {
 		froggy->velocity.y = FROGGY_FALL_VELOCITY;
 	}
@@ -433,14 +437,14 @@ void frog_color(Frog *froggy, float frameTime) {
 	}
 
 	if (froggy->isPoisoned) {
-		float changeTimer = 1.0;			
+		float changeTimer = 1.0f;			
 		
 		froggy->poisonTimer += frameTime;			
 
 		// every modulo of changeTimer, change color n apply damage taken
 		if (fmod(froggy->poisonTimer, changeTimer * 2) < changeTimer) {
             froggy->color = DARKGREEN;
-			froggy->health -= 0.5;
+			froggy->health -= 0.5f;
         } else {
             froggy->color = RAYWHITE;
         }					
@@ -456,7 +460,7 @@ void frog_poisoned(Frog *froggy, float frameTime) {
 
 		if (froggy->poisonTimer >= poisonDuration) {
 			froggy->isPoisoned = false;
-			froggy->poisonTimer = 0.0;
+			froggy->poisonTimer = 0.0f;
 		}
 	}
 }
@@ -506,7 +510,7 @@ void jump_animation(Frog *froggy, int maxFrames, float frameTime, float frameDur
 
 // frog is at the starting position and doesn't land on a lilypad
 void frog_reset_jumpstatus(Frog *froggy) {	
-	if (froggy->position.y >= (float)GetScreenHeight() - 50.0) froggy->isJumping = false;
+	if (froggy->position.y >= (float)GetScreenHeight() - 50.0f) froggy->isJumping = false;
 }
 
 // smaller jump
@@ -514,13 +518,13 @@ void frog_baby_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_lea
 	const float jumpDuration = 1.1f; 
 	const float frameDuration = jumpDuration / 6; 
 
-	// froggy->velocity.x = 0.0;
+	// froggy->velocity.x = 0.0f;
 	if (froggy->status == ALIVE) {
 		if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_SPACE) && !froggy->isJumping) {
-			SetSoundPitch(frog_leap, 1.0);
-			SetSoundVolume(frog_leap, 0.3);
+			SetSoundPitch(frog_leap, 1.0f);
+			SetSoundVolume(frog_leap, 0.3f);
 			PlaySound(frog_leap);			
-			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.7;		
+			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.7f;		
 			froggy->isJumping = true;
 			froggy->jumpTimer = jumpDuration;	
 			froggy->jumpHeight = froggy->position.y;					
@@ -539,8 +543,8 @@ void frog_big_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_leap
 
 	if (froggy->status == ALIVE) {
 		if (IsKeyPressed(KEY_SPACE) && !froggy->isJumping && !IsKeyPressed(KEY_LEFT_SHIFT)) {	
-			SetSoundPitch(frog_leap, 0.90);
-			SetSoundVolume(frog_leap, 0.3);
+			SetSoundPitch(frog_leap, 0.90f);
+			SetSoundVolume(frog_leap, 0.3f);
 			PlaySound(frog_leap);		
 			froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y;		
 			froggy->isJumping = true;
@@ -557,7 +561,7 @@ void frog_big_jump(Frog *froggy, int maxFrames, float frameTime, Sound frog_leap
 
 // movement	frog
 void move_frog(Frog *froggy) { 
-	froggy->velocity.x = 0.0;
+	froggy->velocity.x = 0.0f;
 
 	// side movement
 	if (IsKeyDown(KEY_D)) {
@@ -615,7 +619,7 @@ void hitbox_frog(Frog *froggy) {
 void tongue_attack(Frog *froggy, float angle, float frameTime, Vector2 cameraMousePosition, Sound tongue_slurp) {	
 	if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !froggy->isAttacking && !froggy->isShooting) {
 		// this sound sucks
-		SetSoundPitch(tongue_slurp, 1.0);
+		SetSoundPitch(tongue_slurp, 1.0f);
 		PlaySound(tongue_slurp);
         froggy->isAttacking = true;
         froggy->tongueTimer = 0.0f;   		
@@ -711,8 +715,8 @@ void tongue_attack(Frog *froggy, float angle, float frameTime, Vector2 cameraMou
 		// might not be necessary ?
         if (froggy->tongueTimer >= froggy->attackDuration) {
             froggy->isAttacking = false;
-            froggy->tongue = (Rectangle){ 800, 1280, 0, 0 };
-            froggy->tongueHitbox = (Rectangle){ 800, 1280, 0, 0 };
+            froggy->tongue = (Rectangle){ 800.0f, 1280.0f, 0.0f, 0.0f };
+            froggy->tongueHitbox = (Rectangle){ 800.0f, 1280.0f, 0.0f, 0.0f };
             froggy->tongueAngle = 0.0f;
         }
 	}
@@ -798,10 +802,10 @@ void collision_check_spit(Bugspit *spitty, Bug *bug) {
 	if (CheckCollisionRecs(spitty->hitbox, bug->hitbox)) {
 		// TODO: figure out a value that doesn't 1 shot.
 		if (bug->type == "wasp") {
-			bug->health -= 10.0;
+			bug->health -= 10.0f;
 		// oneshot
 		} else if (bug->type = "mosquito") {
-			bug->health -= 1.0;
+			bug->health -= 1.0f;
 		} 	
 	}
 }
@@ -817,7 +821,7 @@ void draw_spit(Bugspit *spitty) {
 	// debug spit hitbox
     // DrawRectanglePro(
 	// 	spitty->hitbox,
-	// 	(Vector2){ 0, 0},
+	// 	(Vector2){ 0.0f, 0.0f},
 	// 	spitty->angle,
 	// 	RAYWHITE
 	// );
@@ -844,11 +848,11 @@ void deactivate_spit(Bugspit *spitty, Frog *froggy) {
 // keep track of where on the sprite the tongue should appear from
 void frog_mouth_position(Frog *froggy) {
 	if (froggy->direction == RIGHT) {				   //offsets to spawn tongue closer to mouth
-		froggy->mouthPosition.x = froggy->position.x + (7.0f * froggy->size * 1.9);
-		froggy->mouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9);
+		froggy->mouthPosition.x = froggy->position.x + (7.0f * froggy->size * 1.9f);
+		froggy->mouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9f);
 	} else {
-		froggy->mouthPosition.x = froggy->position.x - (7.0f * froggy->size * 1.9);
-		froggy->mouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9);				
+		froggy->mouthPosition.x = froggy->position.x - (7.0f * froggy->size * 1.9f);
+		froggy->mouthPosition.y = froggy->position.y - (4.0f * froggy->size * 1.9f);				
 	}
 }
  
@@ -871,26 +875,20 @@ void frog_attack_params(Frog *froggy, float frameTime, Camera2D camera, Texture2
 	float angle = atan2f(dy, dx);
 
 	tongue_attack(froggy, angle, frameTime, cameraMousePosition, tongue_slurp);	
-
-	// spit bug
-	// if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) && !froggy->isAttacking && !froggy->isShooting) {
-	// 	froggy->isShooting = true;		
-	// }
 	spit_bug(froggy, angle, cameraMousePosition, bugspit_texture, activeSpit, spitties, frameTime);
-	// froggy->isShooting = false;
 }
 
 void draw_tongue(Frog *froggy) {
 	if (froggy->isAttacking) {
         DrawRectanglePro(
 			froggy->tongue,
-			(Vector2){0, FROGGY_TONGUE_WIDTH / 2},		
+			(Vector2){0.0f, FROGGY_TONGUE_WIDTH / 2},		
 			froggy->tongueAngle,
 			RED
 		);		
 		// DrawRectanglePro(
 		// 	froggy->tongueHitbox,
-		// 	(Vector2){ 0, FROGGY_TONGUE_WIDTH },
+		// 	(Vector2){ 0.0f, FROGGY_TONGUE_WIDTH },
 		// 	froggy->tongueAngle,
 		// 	WHITE
 		// );
@@ -915,10 +913,7 @@ void move_mosquito(Bug *mosquito, float frameTime) {
 		// update position
 		mosquito->position.x += (float)mosquito->direction * mosquito->velocity.x * frameTime;
 		mosquito->position.y = mosquito->spawnPosition.y + mosquito->waveAmplitude * sinf(mosquito->waveFrequency * mosquito->angle);
-	// don't update position anymore in this func when bug is eaten
-	
-		// mosquito->tonguetouchposition = current position
-
+		// don't update position anymore in this func when bug is eaten	
 		
 	// bug should fall off the screen in case of jump death
 	} else {			
@@ -956,7 +951,7 @@ void move_wasp(Bug *wasp, Frog *froggy, float frameTime) {
 		if (wasp->radius > wasp->minRadius) {
 			wasp->radius -= wasp->convergence * frameTime;
 			// increase the convergence over time
-			wasp->convergence += 0.1;
+			wasp->convergence += 0.1f;
 		}
 
 		// convert radius and angle into x, y coordinates
@@ -982,7 +977,7 @@ void move_wasp(Bug *wasp, Frog *froggy, float frameTime) {
 		// if horizontal movement is +x flip frame right, if -x flip frame pointing left
 		float dif = wasp->position.x - wasp->previousPosition.x;
 
-		if (dif > 0.0) {
+		if (dif > 0.0f) {
 			wasp->direction = LEFT;
 		} else {
 			wasp->direction = RIGHT;
@@ -1048,14 +1043,14 @@ void eat_bug(Frog *froggy, Bug *bug, float frameTime) {
 			bug->hitbox = (Rectangle){
 				froggy->hitbox.x,
 				froggy->hitbox.y,
-				300.0,
-				300.0
+				300.0f,
+				300.0f
 			};
 		}
 
 		// increase in size from eating bug
 		if (CheckCollisionRecs(froggy->hitbox, bug->hitbox) || CheckCollisionRecs(froggy->mouthPosition, bug->hitbox)) {
-			froggy->size += 0.10;			
+			froggy->size += 0.10f;			
 			bug->isActive = false;
 			bug->status = DEAD;
 			bug->isBuzzing = false;
@@ -1082,8 +1077,8 @@ void froggy_eat_heart(Frog *froggy, Heart *hearty, float frameTime) {
 			hearty->hitbox = (Rectangle){
 				froggy->hitbox.x,
 				froggy->hitbox.y,
-				300.0,
-				300.0
+				300.0f,
+				300.0f
 			};
 		}	
 	}
@@ -1128,9 +1123,9 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float frameTime) {
 		// froggy is hitting the bug from the bottom
 		if (froggy->position.y > bug->position.y) {		
 			if (froggy->health >= 0.0) {
-				if (bug->type == "mosquito") froggy->health -= 2.0;					
+				if (bug->type == "mosquito") froggy->health -= 2.0f;					
 				if (bug->type == "wasp") {
-					froggy->health -= 1.0;
+					froggy->health -= 1.0f;
 					froggy->isPoisoned = true;
 				}
 			}	
@@ -1153,7 +1148,7 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float frameTime) {
 		} else if (froggy->position.y < bug->position.y && (froggy->isJumping || froggy->velocity.y <= FROGGY_FALL_VELOCITY)) {
 			// allow the frog to bounce off bug for a boost and kill the bug						
 			if (bug->status == ALIVE) {			
-				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.65;	
+				froggy->velocity.y = -FROGGY_JUMP_VELOCITY_Y * 0.65f;	
 				bug->status = DEAD;		
 				froggy->score++;		
 			}
@@ -1163,17 +1158,17 @@ void collision_check_bugs(Frog *froggy, Bug *bug, float frameTime) {
 
 // frog dies when health goes to 0 . . . .	
 void froggy_death(Frog *froggy) {	
-	if (froggy->health <= 0) {
-		froggy->velocity.x = 0;
-		froggy->health = 0;
+	if (froggy->health <= 0.0f) {
+		froggy->velocity.x = 0.0f;
+		froggy->health = 0.0f;
 		froggy->status = DEAD;	
 		froggy->frame = 5;		
 	}
 }
 
 void bug_death(Bug *bug) {
-	if (bug->health <= 0) {		
-		bug->health = 0;
+	if (bug->health <= 0.0f) {		
+		bug->health = 0.0f;
 		bug->status = DEAD;				
 	}
 }
@@ -1257,9 +1252,9 @@ void buzz_volume_control(Bug *bug, Frog *froggy, float maxDistance) {
 	float distance = sqrt(pow(bug->position.x - froggy->position.x, 2) + pow(bug->position.y - froggy->position.y, 2));
 
 	// only play sounds when the mosquito is in field of view. (-50, 1280)
-	if (bug->position.x > -50.0 && bug->position.x < SCREEN_WIDTH) {		
+	if (bug->position.x > -50.0f && bug->position.x < SCREEN_WIDTH) {		
 		// normalize distance * magic number for enhanced effect
-		float normDist = 1.0 - (distance / maxDistance * 2.5); 
+		float normDist = 1.0f - (distance / maxDistance * 2.5); 
 
 		// set volume based on distance
 		float volume = normDist;
@@ -1270,13 +1265,13 @@ void buzz_volume_control(Bug *bug, Frog *froggy, float maxDistance) {
 
 		// change the pitch and volume when bug is caught on the tongue
 		if (bug->isEaten) {
-			volume = 0.9;
-			SetSoundPitch(bug->sound, 0.9);
+			volume = 0.9f;
+			SetSoundPitch(bug->sound, 0.9f);
 		}		
 		SetSoundVolume(bug->sound, volume);	
 	// offscreen volume
 	} else {
-		SetSoundVolume(bug->sound, 0);
+		SetSoundVolume(bug->sound, 0.0f);
 	}
 }
 
@@ -1306,7 +1301,7 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sou
 	mosquito->buzzIndex = get_buzz_index();
 	if (mosquito->buzzIndex >= 0 && mosquito->buzzIndex < MAX_MOSQUITOES) {
 		mosquito->sound = buzzes[mosquito->buzzIndex];
-		SetSoundVolume(mosquito->sound, 0);	
+		SetSoundVolume(mosquito->sound, 0.0f);	
 		PlaySound(mosquito->sound);
 	}		
 
@@ -1315,8 +1310,8 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sou
 		// either spawn on the left or the right side just past the window's edge	
 		640.0f + (GetRandomValue(0, 1) == 0 ? -1440.0f : 800.0f),
 		froggy->position.y + GetRandomValue(-500, -400), 
-		0, 
-		0
+		0.0f, 
+		0.0f
 	};	
 
 	mosquito->spawnPosition = (Vector2){ mosquito->position.x, mosquito->position.y };
@@ -1330,7 +1325,7 @@ void spawn_mosquito(Bug *mosquito, Frog *froggy, Texture2D mosquito_texture, Sou
 	mosquito->isActive = true;
 	mosquito->type = "mosquito";
 	mosquito->isEaten = false;
-	mosquito->health = 1.0;	
+	mosquito->health = 1.0f;	
 	mosquito->isBuzzing = true;	
 }
 
@@ -1340,12 +1335,12 @@ void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {
     wasp->position = (Rectangle){
 		froggy->position.x + (float)GetRandomValue(-250, 250), 
 		froggy->position.y + (float)GetRandomValue(200, 300), 
-		0, 
-		0
+		0.0f, 
+		0.0f
 	};
 
 	wasp->spawnPosition = (Vector2){ wasp->position.x, wasp->position.y };
-    wasp->angle = 0;
+    wasp->angle = 0.0f;
     wasp->radius = (float)GetRandomValue(WASP_RADIUS_MIN, WASP_RADIUS_MAX);	
 	// random direction
 	int randomDirection = GetRandomValue(0,1);
@@ -1365,10 +1360,10 @@ void spawn_wasp(Bug *wasp, Frog *froggy, Texture2D wasp_texture) {
 void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {		
 	pad->texture = lilypad_texture;
 	pad->position = (Rectangle){
-		.x = froggy->position.x + GetRandomValue(-700, 600),
-		.y = froggy->position.y + GetRandomValue(-1600, 300),
-		.width = 0.0,
-		.height = 36.0,
+		.x = froggy->position.x + (float)GetRandomValue(-700, 600),
+		.y = froggy->position.y + (float)GetRandomValue(-1600, 300),
+		.width = 0.0f,
+		.height = 36.0f,
 	};
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;	
@@ -1379,10 +1374,10 @@ void make_lilypads(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
 void make_lilypads_offscreen(Lilypad *pad, Texture2D lilypad_texture, Frog *froggy) {
 	pad->texture = lilypad_texture;
 	pad->position = (Rectangle){
-		.x = froggy->position.x + GetRandomValue(-600, 600),
-		.y = froggy->position.y + GetRandomValue(-800, -1000),
-		.width = 0.0,
-		.height = 36.0,
+		.x = froggy->position.x + (float)GetRandomValue(-600, 600),
+		.y = froggy->position.y + (float)GetRandomValue(-800, -1000),
+		.width = 0.0f,
+		.height = 36.0f,
 	};	
 	pad->frame = GetRandomValue(0,3);
 	pad->isActive = true;
@@ -1481,13 +1476,13 @@ void activate_fish(Fish *fishy, Frog *froggy, Sound fish_splash) {
 		// different splash volumes for size fish
 		switch (fishy->size) {
 		case 1:
-			SetSoundVolume(fish_splash, 0.4);
+			SetSoundVolume(fish_splash, 0.4f);
 			break;
 		case 2:
-			SetSoundVolume(fish_splash, 0.7);
+			SetSoundVolume(fish_splash, 0.7f);
 			break;
 		case 3:
-			SetSoundVolume(fish_splash, 1.0);
+			SetSoundVolume(fish_splash, 1.0f);
 			break;		
 		default:
 			break;
@@ -1495,7 +1490,7 @@ void activate_fish(Fish *fishy, Frog *froggy, Sound fish_splash) {
 
 		if (CheckCollisionRecs(fishy->hitbox, froggy->hitbox) && fishy->isActive) {
 			fishy->isAttacking = true;
-			SetSoundVolume(fish_splash, 1.0);
+			SetSoundVolume(fish_splash, 1.0f);
 			PlaySound(fish_splash);
 		}
 	}
@@ -1632,8 +1627,8 @@ void hitbox_heart(Heart *hearty) {
 	hearty->hitbox = (Rectangle){
 		hearty->position.x,
 		hearty->position.y,
-		16.0,
-		16.0
+		16.0f,
+		16.0f
 	};
 }
 
@@ -1654,7 +1649,7 @@ void deactivate_heart(Heart *hearty, Frog *froggy) {
 	// if the frog has interacted with it 
 	if (CheckCollisionRecs(froggy->hitbox, hearty->hitbox)  || CheckCollisionRecs(froggy->mouthPosition, hearty->hitbox)) {
 		hearty->isActive = false;
-		froggy->health += 25.0;
+		froggy->health += 25.0f;
 	}
 
 	// // if the pad it spawned on is deactivated
@@ -1674,8 +1669,8 @@ void draw_heart(Heart *hearty) {
 	DrawTextureRec(
 		hearty->texture,
 		(Rectangle){
-			0,
-			0,
+			0.0f,
+			0.0f,
 			hearty->texture.width,
 			hearty->texture.height
 		},
@@ -1690,14 +1685,14 @@ void draw_heart(Heart *hearty) {
 // duck movement.
 void move_duckhorde(Duckhorde *duckies, Frog *froggy, float frameTime) {	
 	if (froggy->status == ALIVE) { 
-		duckies->position.y -= (duckies->velocity * GetRandomValue(100, 200)) * frameTime;
+		duckies->position.y -= (duckies->velocity * (float)GetRandomValue(100, 200)) * frameTime;
 	}
 }
 
 // when froggy is very far upward, update duckhorde position so they'll be near again. . . 
 void update_duckhorde_position(Duckhorde *duckies, Frog *froggy) {
-	if (froggy->position.y < duckies->position.y - 1200.0) {
-		duckies->position.y = froggy->position.y + 800.0;
+	if (froggy->position.y < duckies->position.y - 1200.0f) {
+		duckies->position.y = froggy->position.y + 800.0f;
 	}
 }
 
@@ -1716,8 +1711,8 @@ void draw_duckhorde(Duckhorde *duckies) {
 	DrawTexturePro(
 		duckies->texture,
 		(Rectangle){
-			0,
-			0,
+			0.0f,
+			0.0f,
 			duckies->texture.width,
 			duckies->texture.height
 		},
@@ -1727,22 +1722,19 @@ void draw_duckhorde(Duckhorde *duckies) {
 			duckies->texture.width,
 			duckies->texture.height
 		},
-		(Vector2){ 
-			0,   
-			0
-		},
+		(Vector2){ 0.0f, 0.0f },
 		0.0f,  
 		RAYWHITE  
 	);
 
 	// draw duckhorde hitbox
-	DrawRectangleLinesEx(duckies->hitbox, 3, RED); 
+	DrawRectangleLinesEx(duckies->hitbox, 3.0f, RED); 
 }
 
 // p much insta-death when the duckies reach the frog
 void froggy_duckhorde_collision(Frog *froggy, Duckhorde *duckies){
 	if (CheckCollisionRecs(froggy->hitbox, duckies->hitbox)) {
-		froggy->health -= 50.0;
+		froggy->health -= 50.0f;
 	}
 }
 
@@ -1758,13 +1750,13 @@ void draw_duckhorde_surfline(Duckhorde *duckies, float frameTime){
 	for (int x = 0; x < screenwidth; x++) {
 		float y = (duckies->position.y + 400.0f) + sinf((x + duckies->wavetime * 100) * (2 * PI / wavelength)) * amplitude;
 		// TODO: draw circle is an expensive operation, use a circle texture instead for performance?
-		DrawCircle(x, (int)y, 3, DARKBLUE);  
+		DrawCircle(x, (int)y, 3.0f, DARKBLUE);  
 	}
 }
 
 void draw_duckhorde_water(Duckhorde *duckies) {
 	// below the surf draw big block
-	DrawRectangle(0, duckies->position.y + 400.0, 1280.0, 800.0, DARKBLUE);
+	DrawRectangle(0, (int)duckies->position.y + 400, 1280, 800, DARKBLUE);
 }
 
 int get_highscore() {    
@@ -1785,7 +1777,6 @@ int get_highscore() {
             fclose(file);
         } 
     }
-
     return highscore;
 }
 
@@ -1806,7 +1797,7 @@ int main () {
 	SetTargetFPS(60);
 
 	// Create the window and OpenGL context
-	InitWindow(1280, 800, "Frog");
+	InitWindow(1280, 800, "Froggy");
 	// initialize audio
 	InitAudioDevice();	
 
@@ -1821,10 +1812,10 @@ int main () {
 	Frog froggy = (Frog){
 		.texture = frog_texture,
 		.position = (Rectangle){
-			.x = 600.0,
-			.y = 800.0,
-			.width = 0.0,
-			.height = 36.0,
+			.x = 600.0f,
+			.y = 800.0f,
+			.width = 0.0f,
+			.height = 36.0f,
 		},						
 		.direction = RIGHT,		
 		.isJumping = false,
@@ -1835,10 +1826,10 @@ int main () {
 		.status = ALIVE,
 		.highestPosition = 0.0f,
 		.isBouncing = false,
-		.tongue = (Rectangle){ 800, 1280, 0, 0 },
-		.tongueHitbox = (Rectangle){ 800, 1280, 0, 0 },
+		.tongue = (Rectangle){ 800.0f, 1280.0f, 0.0f, 0.0f },
+		.tongueHitbox = (Rectangle){ 800.0f, 1280.0f, 0.0f, 0.0f },
 		.attackDuration = FROGGY_ATTACK_DURATION,
-		.size = 1.0,	
+		.size = 1.0f,	
 		.bugsEaten = 0,
 		.isShooting = false,
 		.dropDown = false,		
@@ -1853,13 +1844,13 @@ int main () {
 	Duckhorde duckies = (Duckhorde){
 		.texture = duckhorde_texture,
 		.position = (Rectangle){ 
-			.x = 0,
-			.y = 1600,
-			.width = duckhorde_texture.width,
-			.height= duckhorde_texture.height
+			.x = 0.0f,
+			.y = 1600.0f,
+			.width = (float)duckhorde_texture.width,
+			.height = (float)duckhorde_texture.height
 			},
 		.velocity = DUCKHORDE_UPWARD_VELOCITY,
-		.wavetime = 0.0
+		.wavetime = 0.0f
 	};
 
 	// 8 pictures on the frog sprite sheet -> 
@@ -1868,8 +1859,8 @@ int main () {
 
 	// initialize camera 
 	Camera2D camera = {0};
-	camera.target = (Vector2){0, froggy.position.y};  
-	camera.offset = (Vector2){0, GetScreenHeight() / 2.0f};  
+	camera.target = (Vector2){ 0.0f, froggy.position.y};  
+	camera.offset = (Vector2){ 0.0f, (float)(GetScreenHeight() / 2)};  
 	camera.rotation = 0.0f;
 	camera.zoom = 1.0f;
 
@@ -2177,8 +2168,8 @@ int main () {
 		activeFlameprojectiles = activeFlameprojectilesAfterLoop;
 
 		// if froggy below ground, put it back on ground
-    	if (froggy.position.y > GetScreenHeight() - froggy.position.height) {
-			froggy.position.y = GetScreenHeight() - froggy.position.height;
+    	if (froggy.position.y > (float)(GetScreenHeight() - froggy.position.height)) {
+			froggy.position.y = (float)(GetScreenHeight() - froggy.position.height);
 		}
 
 		// update highscore in current game
@@ -2203,7 +2194,7 @@ int main () {
 		}
 
 		// debugging: visual hitboxes
-		DrawRectangleLinesEx(froggy.hitbox, 1, GREEN); 	
+		DrawRectangleLinesEx(froggy.hitbox, 1.0f, GREEN); 	
 			
 		for (int i = 0; i < activePads; i++) {		
 			// draw lilypads
@@ -2211,16 +2202,16 @@ int main () {
 				pads[i].texture,
 				(Rectangle){
 					frameWidthLilypad * pads[i].frame,
-					0,
+					0.0f,
 					frameWidthLilypad,
-					pads[i].texture.height	
+					(float)pads[i].texture.height	
 				},
-				(Vector2){ (float)pads[i].position.x,(float)pads[i].position.y},
+				(Vector2){ (float)pads[i].position.x, (float)pads[i].position.y },
 				RAYWHITE
 			);
 			
 			// lilypad hitbox visual
-			// DrawRectangleLinesEx(pads[i].hitbox, 1, RED); 			
+			// DrawRectangleLinesEx(pads[i].hitbox, 1.0f, RED); 			
 		}
 
 		// Setup the back buffer for drawing (clear color and depth buffers)
@@ -2235,22 +2226,23 @@ int main () {
 		DrawTexturePro(
 			froggy.texture, 
 			(Rectangle){
-				frameWidth * froggy.frame, 
-				0, 
+				frameWidth * (float)froggy.frame, 
+				0.0f, 
 				// flip the texture horizontally depending on direction it's facing
 				(froggy.direction == RIGHT) ? -frameWidth: frameWidth,	
 				// flip the texture vertically when the frog is dead						
-				froggy.texture.height * ((froggy.status == DEAD) ? -1 : 1) }, 
+				(float)(froggy.texture.height * ((froggy.status == DEAD) ? -1 : 1)) }, 
 			(Rectangle){
 				froggy.position.x,
 				froggy.position.y,
 				frameWidth * froggy.size,					
-				(float)froggy.texture.height * froggy.size },
-			  (Vector2){ 
+				(float)(froggy.texture.height * froggy.size) 
+			},
+			(Vector2){ 
 				frameWidth * froggy.size / 2, 
 				(float)froggy.texture.height * froggy.size / 2 
    			}, 
-			0,
+			0.0f,
 			froggy.color
 		);	
 			 
@@ -2272,9 +2264,9 @@ int main () {
 				fishies[i].texture,  
 				(Rectangle){
 					frameWidthFish * fishies[i].frame,  
-					0,                                  
-					frameWidthFish * (float)fishies[i].direction,                      
-					fishies[i].texture.height            
+					0.0f,                                  
+					frameWidthFish * fishies[i].direction,                      
+					(float)fishies[i].texture.height            
 				},
 				(Rectangle){
 					fishies[i].position.x,               
@@ -2321,16 +2313,16 @@ int main () {
 				wasps[i].texture,
 				(Rectangle){
 					frameWidthWasp * wasps[i].frame,
-					0,
+					0.0f,
 					frameWidthWasp * wasps[i].direction,
-					wasps[i].texture.height * wasps[i].status
+					(float)(wasps[i].texture.height * wasps[i].status)
 				},
 				(Rectangle){
 					wasps[i].position.x,
 					wasps[i].position.y,
-					frameWidthWasp * GetRandomValue(9, 10) / 10.0,					
-					(float)wasps[i].texture.height * GetRandomValue(9, 10) / 10.0},
-				(Vector2){ 0, 0},
+					frameWidthWasp * (float)(GetRandomValue(9, 10) / 10.0f),					
+					(float)wasps[i].texture.height * (float)(GetRandomValue(9, 10) / 10.0f)},
+				(Vector2){ 0.0f, 0.0f },
 				0.0f,
 				(wasps[i].status == ALIVE) ? RAYWHITE : RED
 			);

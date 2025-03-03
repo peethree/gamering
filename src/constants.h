@@ -5,7 +5,7 @@ extern const float SCREEN_WIDTH;
 extern const float SCREEN_HEIGHT; 
 
 // mosquito
-#define MAX_MOSQUITOES 10
+#define MAX_MOSQUITOES 10 // preprocess max array length
 extern const float MOSQUITO_SPAWN_INTERVAL; 
 extern const float MOSQUITO_SPAWN_TIMER; 
 extern const float MOSQUITO_VELOCITY_X;
