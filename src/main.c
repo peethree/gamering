@@ -5,6 +5,7 @@
 #include <stdio.h> 
 
 // TODO: 
+// use size_t instead of int for for loops
 // make a texture for flame spitter / flame projectile
 // make the flame projectile spit cooldown independant per sprite
 // add a burning status for the frog similar to poison, draw flame behind the froggy?
@@ -189,32 +190,43 @@ typedef struct Flameprojectile{
 
 // initialize flamespitter
 void spawn_flamespitter(Flamespitter *flamey, Lilypad *pads, Frog *froggy, int activePads, int *activeFlamespitters, Texture2D flamespitter_texture) {
-	// spawn a flamespitter and place it ontop of a lilypad
-	int randomLily = GetRandomValue(0, activePads - 1);
+	// look for a valid pad for a flamespitter to spawn on
+	int validPads[MAX_LILLYPADS];
+	int validCount = 0;
 
-	// don't spawn on lilypads that already have a heart spawn.
-	if (pads[randomLily].hasHeart) {
-		return;
-	}
-	
-	// TODO: don't spawn on lilypad that's offscreen, maybe change lilypad spawn logic?
-	// look at heart spawn logic, apply something similar to flamespitters
-
-	flamey->texture = flamespitter_texture;
-	flamey->position = pads[randomLily].position;
-
-	// set initial direction
-	if (froggy->position.x > flamey->position.x) {
-		flamey->direction = RIGHT;
-	} else {
-		flamey->direction = LEFT;
+	for (int i = 0; i < activePads; i++) {
+		if (pads[i].position.y < froggy->position.y) {
+			validPads[validCount++] = i;
+		}
 	}
 
-	flamey->status = ALIVE;
-	flamey->isActive = true;
-	flamey->spitCooldown = FLAME_SPITTER_SPIT_COOLDOWN;
-	flamey->health = FLAME_SPITTER_HEALTH;
-	(*activeFlamespitters)++;
+	// only spawn if there is a valid pad
+	if (validCount > 0) {
+		// pick a random valid pad
+		int randomIndex = GetRandomValue(0, validCount - 1);
+		int padIndex = validPads[randomIndex];
+
+		// don't spawn on lilypads that already have a heart spawn
+		if (pads[padIndex].hasHeart) {
+			return;
+		}
+
+		flamey->texture = flamespitter_texture;
+		flamey->position = pads[padIndex].position;
+
+		// set initial direction
+		if (froggy->position.x > flamey->position.x) {
+			flamey->direction = RIGHT;
+		} else {
+			flamey->direction = LEFT;
+		}
+
+		flamey->status = ALIVE;
+		flamey->isActive = true;
+		flamey->spitCooldown = FLAME_SPITTER_SPIT_COOLDOWN;
+		flamey->health = FLAME_SPITTER_HEALTH;
+		(*activeFlamespitters)++;
+	}
 }
 
 // update the direction the flamespitter is facing based on position of the frog
